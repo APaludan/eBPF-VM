@@ -49,6 +49,8 @@ int vm_handler::LoadAndAttachAll(pid_t protected_pid)
   if (int err = skel_obj.get()->attach(skel_obj.get()))
     return (std::cerr << "Failed to attach: " << err << "\n", rb.reset(), err);
 
+
+  // has the same functionality as the mem_access ptrace ebpf program
   std::vector<vm_inst> program = {
       //      op,   dst, src, val
       vm_inst{OP_LOAD, 1, 0, protected_pid},      // r1 = protected_pid
@@ -59,7 +61,7 @@ int vm_handler::LoadAndAttachAll(pid_t protected_pid)
       // r0 = pid that triggered ebpf
       // r1 = protected pid
       // r2 = target pid
-      vm_inst{OP_JNEQ, 1, 2, 6},    // if r1(protected pid) != r2(target pid): jump to exit
+      vm_inst{OP_JNEQ, 1, 2, 6},    // if r1(protected pid) != r2(target pid): jump to exit (instruction at index 6)
       vm_inst{OP_RINGBUF, 0, 0, 0}, // submit info to ringbuf
       vm_inst{OP_EXIT, 0, 0, 0}     // exit
   };
