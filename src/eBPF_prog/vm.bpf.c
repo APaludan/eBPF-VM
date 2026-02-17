@@ -5,6 +5,8 @@
 #include "vm.h"
 #include <errno.h>
 
+static long vm_callback_fn(u64 index, void *ctx);
+
 struct
 {
   __uint(type, BPF_MAP_TYPE_RINGBUF);
@@ -18,6 +20,26 @@ struct
   __type(key, __u32);
   __type(value, struct vm_inst);
 } bytecode_map SEC(".maps");
+
+
+SEC("tp/syscalls/sys_enter_ptrace")
+int ebpf_vm_interpreter(struct trace_event_raw_sys_enter *ctx)
+{
+  struct vm_state vm = {0};
+  vm.type = PTRACE2;
+  vm.data = (void *)ctx;
+  vm.map = &bytecode_map;
+
+  bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+
+  // for (u64 i = 0; i < VM_MAX_LOOPS; i++)
+  // {
+  //   vm_callback_fn(i, (void *) &vm);
+  // }
+
+  return 0;
+}
+
 
 static long vm_callback_fn(u64 index, void *ctx)
 {
@@ -137,24 +159,6 @@ static long vm_callback_fn(u64 index, void *ctx)
   }
 
   vm->pc++;
-  return 0;
-}
-
-SEC("tp/syscalls/sys_enter_ptrace")
-int ebpf_vm_interpreter(struct trace_event_raw_sys_enter *ctx)
-{
-  struct vm_state vm = {0};
-  vm.type = PTRACE2;
-  vm.data = (void *)ctx;
-  vm.map = &bytecode_map;
-
-  bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
-
-  // for (u64 i = 0; i < VM_MAX_LOOPS; i++)
-  // {
-  //   vm_callback_fn(i, (void *) &vm);
-  // }
-
   return 0;
 }
 

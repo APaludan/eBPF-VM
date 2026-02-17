@@ -22,7 +22,5 @@ if(NOT rv EQUAL 0)
   )
 endif()
 
-message(STATUS "vmlinux.h generated successfully at ${VMLINUX_OUT}")
-
 add_library(bpf_headers INTERFACE)
 target_include_directories(bpf_headers INTERFACE ${BPF_OUT})

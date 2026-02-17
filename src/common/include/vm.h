@@ -17,7 +17,7 @@
 // how to find offsets: sudo cat /sys/kernel/tracing/events/syscalls/sys_enter_ptrace/format
 #define OP_RINGBUF 14 // submit vm state to ringbuffer
 
-#define VM_MAX_INSTRUCTIONS 1000
+#define VM_MAX_INSTRUCTIONS 10000
 #define VM_MAX_LOOPS 100000
 
 enum vm_event_type
