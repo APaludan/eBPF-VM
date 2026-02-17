@@ -1,4 +1,4 @@
-set(eBPF_HANDLER_SOURCES kmod_tracker_handler.cpp mem_access_handler.cpp)
+set(eBPF_HANDLER_SOURCES kmod_tracker_handler.cpp mem_access_handler.cpp vm_handler.cpp)
 
 add_library(eBPF_Handlers ${eBPF_HANDLER_SOURCES})
 

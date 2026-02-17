@@ -1,4 +1,4 @@
-set(AGENTS_SOURCES kmod_tracker_agent.cpp mem_access_agent.cpp)
+set(AGENTS_SOURCES kmod_tracker_agent.cpp mem_access_agent.cpp vm_agent.cpp)
 
 add_library(Agents ${AGENTS_SOURCES})
 
