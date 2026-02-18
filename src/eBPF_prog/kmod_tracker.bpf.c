@@ -1,7 +1,10 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 #define BPF_NO_GLOBAL_DATA
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-declarations"
 #include "vmlinux.h"
+#pragma clang diagnostic pop
 
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_helpers.h>

@@ -57,12 +57,21 @@ int vm_handler::LoadAndAttachAll(pid_t protected_pid)
       vm_inst{OP_CALL, 0, 0, 14},                 // call bpf_get_current_pid_tgid (nr 14)
       vm_inst{OP_RSHIFT, 0, 0, 32},               // r0 = r0 >> 32 (extract PID only)
       vm_inst{OP_READ_CTX, 2, 24, sizeof(pid_t)}, // read the target pid from ctx + offset 24 = (ctx->args[1])
+      // ====== TEST FOR STACK ========
+      // vm_inst{OP_CALL, 0, 0, 16},                 // call bpf_get_current_comm and save result in stack at sp
+      // vm_inst{OP_LOAD_SP, 3, 0, 0},               // r3 = address of sp
+      // vm_inst{OP_PRINTS, 0, 3, 0},                // print string at address in r3
+      // vm_inst{OP_LOAD, 4, 0, 1},                  // r4 = 1
+      // vm_inst{OP_ADD, 3, 4, 1},                   // r3 += 1
+      // vm_inst{OP_PRINTS, 0, 3, 0},                // print string at address in r3 (remove one char from prev print)
+      // ==============================
       // NOW:
       // r0 = pid that triggered ebpf
       // r1 = protected pid
       // r2 = target pid
-      vm_inst{OP_JNEQ, 1, 2, 6},    // if r1(protected pid) != r2(target pid): jump to exit (instruction at index 6)
+      vm_inst{OP_JNEQ, 1, 2, 2},    // if r1(protected pid) != r2(target pid): jump to exit (pc +2)
       vm_inst{OP_RINGBUF, 0, 0, 0}, // submit info to ringbuf
+      vm_inst{OP_LOAD, 0, 0, 0},    // set exit code
       vm_inst{OP_EXIT, 0, 0, 0}     // exit
   };
 

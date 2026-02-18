@@ -52,6 +52,7 @@ void vm_agent::printEventData(const vm_event &e)
         std::cout << val << " ";
     }
     std::cout << "\n";
+    std::cout << "PC              : " << e.pc << "\n";
     std::cout << "Event type      : " << event_type_to_string(e.type) << "\n";
     std::cout << "======================\n";
 }
@@ -74,6 +75,8 @@ std::string_view event_type_to_string(vm_event_type type)
         return "KERNEL_TASK_LOOKUP";
     case K_VPID_LOOKUP2:
         return "KERNEL_VPID_LOOKUP";
+    case VM_ERROR:
+        return "VM_ERROR";
     default:
         return "UNKNOWN_EVENT";
     }

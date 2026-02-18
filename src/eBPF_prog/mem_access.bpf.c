@@ -1,4 +1,7 @@
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-declarations"
 #include "vmlinux.h"
+#pragma clang diagnostic pop
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
