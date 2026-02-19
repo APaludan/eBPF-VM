@@ -23,12 +23,13 @@
 #define OP_LOAD     40  // load regs[dst] = val
 #define OP_LOAD_SP  41  // load sp into reg[dst]
 #define OP_SET_SP   42  // inc/dec sp by a val or a value of reg[src]
-#define OP_READ_CTX 43  // read from vm.data. src = offset, val = size in bytes
+#define OP_READ     43  // read val bytes from ptr
+#define OP_READ_CTX 44  // read from vm.data. src = offset, val = size in bytes
                         // how to find offsets: 
-                        // sudo cat /sys/kernel/tracing/events/syscalls/sys_enter_ptrace/format
-                        // dont know how to with kprobes or lsm :(
-#define OP_PUSH     44  // TODO: push regs[src] onto stack and sp += 8
-#define OP_POP      45  // TODO: sp -= 8 and pop top of stack into a regs[dst]
+                        // pahole -C <struct name>
+                        // exmaple: pahole -C file
+#define OP_PUSH     45  // TODO: push regs[src] onto stack and sp += 8
+#define OP_POP      46  // TODO: sp -= 8 and pop top of stack into a regs[dst]
 
 // output
 #define OP_PRINT    60  // print bpf_printk(regs[src]) as %llu

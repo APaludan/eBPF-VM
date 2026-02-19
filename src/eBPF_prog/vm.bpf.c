@@ -24,7 +24,14 @@ struct
   __uint(max_entries, VM_MAX_INSTRUCTIONS * sizeof(struct vm_inst));
   __type(key, unsigned int);
   __type(value, struct vm_inst);
-} bytecode_map SEC(".maps");
+} ptrace_instructions SEC(".maps");
+struct
+{
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __uint(max_entries, VM_MAX_INSTRUCTIONS * sizeof(struct vm_inst));
+  __type(key, unsigned int);
+  __type(value, struct vm_inst);
+} lsm_open_instructions SEC(".maps");
 
 SEC("tp/syscalls/sys_enter_ptrace")
 int ebpf_vm_interpreter(struct trace_event_raw_sys_enter *ctx)
@@ -32,11 +39,28 @@ int ebpf_vm_interpreter(struct trace_event_raw_sys_enter *ctx)
   struct vm_state vm = {0};
   vm.type = PTRACE2;
   vm.data = (void *)ctx;
-  vm.map = &bytecode_map;
+  vm.map = &ptrace_instructions;
 
   bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
   return (int)vm.regs[0];
+}
+
+SEC("lsm/file_open")
+int BPF_PROG(restrict_proc_access, struct file *file)
+{
+  struct vm_state vm = {0};
+  vm.type = OPEN2;
+  vm.data = (void *)file;
+  vm.map = &lsm_open_instructions;
+
+  bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+
+  return 0; // remove when vm prog works correctly
+
+  int ret = (int)vm.regs[0];
+
+  return (ret == 0) ? 0 : -EPERM;
 }
 
 static long vm_callback_fn(unsigned int nr_loops, void *ctx)
@@ -53,7 +77,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
   switch (inst->op)
   {
   case OP_LOAD:
-    vm->regs[inst->dst] = (long long) inst->val;
+    vm->regs[inst->dst] = (long long)inst->val;
     break;
 
   case OP_ADD:
@@ -83,7 +107,8 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     break;
 
   case OP_EXIT:
-    bpf_printk("Exit after %u loops", nr_loops);
+    // bpf_printk("Exit after %u loops", nr_loops);
+    // bpf_printk("Exit at pc = %u", vm->pc);
     return 1;
 
   case OP_CALL:
@@ -132,6 +157,17 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     }
     break;
 
+  case OP_READ:
+  {
+    unsigned int len = (unsigned int)inst->val;
+    if (len > sizeof(vm->regs[inst->dst]))
+      return vm_error(vm);
+
+    vm->regs[0] = bpf_probe_read_kernel(&vm->regs[inst->dst], len, (void *)vm->regs[inst->src]);
+
+    break;
+  }
+
   case OP_READ_CTX:
   {
     unsigned int len = (unsigned int)inst->val;
@@ -156,6 +192,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
       {
         e->reg_values[i] = vm->regs[i];
       }
+      e->pc = vm->pc;
       bpf_ringbuf_submit(e, 0);
     }
     break;
