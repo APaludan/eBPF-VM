@@ -22,4 +22,3 @@ include(BPF)
 include(CPM)
 
 add_subdirectory(src)
-add_subdirectory(app)

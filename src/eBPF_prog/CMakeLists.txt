@@ -1,5 +1,5 @@
 # src/eBPF_prog/CMakeLists.txt
-set(EBPF_PROGRAMS kmod_tracker.bpf.c mem_access.bpf.c vm.bpf.c)
+set(EBPF_PROGRAMS vm.bpf.c)
 set_source_files_properties(${EBPF_PROGRAMS} PROPERTIES LANGUAGE C)
 
 # 1. Keep the library so the LSP/clangd works

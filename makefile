@@ -13,7 +13,7 @@ clean:
 	@echo "Build directory cleaned." 
 
 run:
-	@sudo $(BUILD_DIR)/app/TyrSecure
+	@sudo $(BUILD_DIR)/src/TyrSecure
 
 debug:
 	@sudo cat /sys/kernel/tracing/trace_pipe
