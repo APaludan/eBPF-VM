@@ -86,3 +86,14 @@ struct vm_state
   void *data;
   enum vm_event_type type;
 };
+
+static inline void xor_rolling(uint8_t *data, size_t len, uint8_t key)
+{
+    uint8_t rolling_key = key;
+
+    for (size_t i = 0; i < len; i++)
+    {
+        data[i] ^= rolling_key;
+        rolling_key = (rolling_key + 1) & 0xFF;
+    }
+};
