@@ -172,10 +172,12 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
 
   case OP_READ:
   {
-    // The verifier now knows 'size' cannot be negative or larger than 7
-    unsigned int size = (unsigned int)inst.val & 0x7; 
-    
-    if (size == 0) size = 8; // Optional: default to 8 if 0
+      long long val = inst.val;
+      if (val <= 0 || val > 230) {
+          return vm_error(vm);
+      }
+
+      unsigned int size = (unsigned int)val;
 
     vm->regs[0] = bpf_probe_read_kernel(&vm->regs[inst.dst],
                                         size,
@@ -186,11 +188,10 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
   case OP_READ_CTX:
   {
     long long val = inst.val;
-    // Explicitly prove to the verifier the value is between 1 and 8
-    if (val <= 0 || val > 8) {
+    if (val <= 0 || val > 230) {
         return vm_error(vm);
     }
-    
+
     unsigned int size = (unsigned int)val;
 
     int err = bpf_probe_read_kernel(&vm->regs[inst.dst],
