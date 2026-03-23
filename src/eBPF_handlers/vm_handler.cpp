@@ -71,7 +71,7 @@ for (uint32_t i = 0; i < ptrace_program.size(); i++)
 {
     vm_inst inst = ptrace_program[i];
 
-    __u8 key = 0x5A ^ i;  // per-instruction key
+    __u8 key = 0x5A;
 
     xor_rolling(reinterpret_cast<uint8_t*>(&inst), sizeof(inst), key);
 
@@ -139,7 +139,7 @@ for (uint32_t i = 0; i < ptrace_program.size(); i++)
 {
     vm_inst inst = lsm_open_program[i];
 
-    __u8 key = 0x5A ^ i; // per-instruction-key
+    __u8 key = 0x5A;
 
     xor_rolling(reinterpret_cast<uint8_t*>(&inst), sizeof(inst), key);
 

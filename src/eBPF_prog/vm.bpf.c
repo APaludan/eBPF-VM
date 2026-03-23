@@ -76,8 +76,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
   // Copy to stack
   struct vm_inst inst = *inst_ptr;
 
-  // Key that is different for each instruction
-  __u8 key = 0x5A ^ vm->pc;
+  __u8 key = 0x5A;
 
   xor_rolling((__u8 *)&inst, sizeof(inst), key);
 
