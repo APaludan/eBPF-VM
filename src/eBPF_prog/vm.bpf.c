@@ -25,6 +25,7 @@ struct
   __type(key, unsigned int);
   __type(value, struct vm_inst);
 } ptrace_instructions SEC(".maps");
+
 struct
 {
   __uint(type, BPF_MAP_TYPE_ARRAY);
@@ -67,119 +68,137 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
 {
   struct vm_state *vm = (struct vm_state *)ctx;
 
-  struct vm_inst *inst = bpf_map_lookup_elem(vm->map, &vm->pc);
-  if (!inst)
+  // Fetch encrypted instruction
+  struct vm_inst *inst_ptr = bpf_map_lookup_elem(vm->map, &vm->pc);
+  if (!inst_ptr)
     return vm_error(vm);
 
-  if (inst->dst >= VM_NUM_REGS || (inst->src >= VM_NUM_REGS && inst->op != OP_READ_CTX))
+  // Copy to stack
+  struct vm_inst inst = *inst_ptr;
+
+  // Key that is different for each instruction
+  __u8 key = 0x5A ^ vm->pc;
+
+  xor_rolling((__u8 *)&inst, sizeof(inst), key);
+
+  if (inst.dst >= VM_NUM_REGS || (inst.src >= VM_NUM_REGS && inst.op != OP_READ_CTX))
     return vm_error(vm);
 
-  switch (inst->op)
+  switch (inst.op)
   {
   case OP_LOAD:
-    vm->regs[inst->dst] = (long long)inst->val;
+    vm->regs[inst.dst] = (long long)inst.val;
     break;
 
   case OP_ADD:
-    vm->regs[inst->dst] += inst->val == 0 ? vm->regs[inst->src] : inst->val;
+    vm->regs[inst.dst] += inst.val == 0 ? vm->regs[inst.src] : inst.val;
     break;
 
   case OP_SUB:
-    vm->regs[inst->dst] -= inst->val == 0 ? vm->regs[inst->src] : inst->val;
+    vm->regs[inst.dst] -= inst.val == 0 ? vm->regs[inst.src] : inst.val;
     break;
 
   case OP_MULT:
-    vm->regs[inst->dst] *= inst->val == 0 ? vm->regs[inst->src] : inst->val;
+    vm->regs[inst.dst] *= inst.val == 0 ? vm->regs[inst.src] : inst.val;
     break;
 
   case OP_DIV:
-    vm->regs[inst->dst] /= inst->val == 0 ? vm->regs[inst->src] : inst->val;
+    vm->regs[inst.dst] /= inst.val == 0 ? vm->regs[inst.src] : inst.val;
     break;
 
   case OP_PRINT:
-    bpf_printk("VM Reg[%d] = %llu", inst->src, vm->regs[inst->src]);
+    bpf_printk("VM Reg[%d] = %llu", inst.src, vm->regs[inst.src]);
     break;
+
   case OP_PRINTI:
-    bpf_printk("VM Reg[%d] = %lli", inst->src, vm->regs[inst->src]);
+    bpf_printk("VM Reg[%d] = %lli", inst.src, vm->regs[inst.src]);
     break;
+
   case OP_PRINTS:
-    bpf_printk("VM String = %s", (char *)vm->regs[inst->src]);
+    bpf_printk("VM String = %s", (char *)vm->regs[inst.src]);
     break;
 
   case OP_EXIT:
-    // bpf_printk("Exit after %u loops", nr_loops);
-    // bpf_printk("Exit at pc = %u", vm->pc);
     return 1;
 
   case OP_CALL:
-    switch (inst->val)
+    switch (inst.val)
     {
     case 14:
-      vm->regs[0] = ((long (*)(void))(long)inst->val)();
+      vm->regs[0] = ((long (*)(void))(long)inst.val)();
       break;
+
     case 16:
       if (vm->sp + TASK_COMM_LEN > VM_STACK_SIZE)
         return vm_error(vm);
 
-      vm->regs[0] = ((long (*const)(void *, unsigned int))(long)inst->val)((void *)&vm->stack[vm->sp], TASK_COMM_LEN);
+      vm->regs[0] =
+          ((long (*const)(void *, unsigned int))(long)inst.val)(
+              (void *)&vm->stack[vm->sp], TASK_COMM_LEN);
       break;
+
     default:
-      bpf_printk("call failed, id: %llu", inst->val);
+      bpf_printk("call failed, id: %llu", inst.val);
       return vm_error(vm);
     }
     break;
 
   case OP_LSHIFT:
-    vm->regs[inst->dst] = vm->regs[inst->src] << inst->val;
+    vm->regs[inst.dst] = vm->regs[inst.src] << inst.val;
     break;
 
   case OP_RSHIFT:
-    vm->regs[inst->dst] = vm->regs[inst->src] >> inst->val;
+    vm->regs[inst.dst] = vm->regs[inst.src] >> inst.val;
     break;
 
   case OP_JMP:
-    vm->pc += inst->val;
+    vm->pc += inst.val;
     return 0;
 
   case OP_JEQ:
-    if (vm->regs[inst->dst] == vm->regs[inst->src])
+    if (vm->regs[inst.dst] == vm->regs[inst.src])
     {
-      vm->pc += inst->val;
+      vm->pc += inst.val;
       return 0;
     }
     break;
 
   case OP_JNEQ:
-    if (vm->regs[inst->dst] != vm->regs[inst->src])
+    if (vm->regs[inst.dst] != vm->regs[inst.src])
     {
-      vm->pc += inst->val;
+      vm->pc += inst.val;
       return 0;
     }
     break;
 
   case OP_READ:
   {
-    unsigned int len = (unsigned int)inst->val;
-    if (len > sizeof(vm->regs[inst->dst]))
+    unsigned int len = (unsigned int)inst.val;
+    if (len > sizeof(vm->regs[inst.dst]))
       return vm_error(vm);
 
-    vm->regs[0] = bpf_probe_read_kernel(&vm->regs[inst->dst], len, (void *)vm->regs[inst->src]);
-
+    vm->regs[0] =
+        bpf_probe_read_kernel(&vm->regs[inst.dst],
+                              len,
+                              (void *)vm->regs[inst.src]);
     break;
   }
 
   case OP_READ_CTX:
   {
-    unsigned int len = (unsigned int)inst->val;
-    if (len > sizeof(vm->regs[inst->dst]))
+    unsigned int len = (unsigned int)inst.val;
+    if (len > sizeof(vm->regs[inst.dst]))
       return vm_error(vm);
 
-    int err = bpf_probe_read_kernel(&vm->regs[inst->dst], len, vm->data + (size_t)inst->src);
+    int err = bpf_probe_read_kernel(&vm->regs[inst.dst],
+                                    len,
+                                    vm->data + (size_t)inst.src);
     if (err)
       return vm_error(vm);
 
     break;
   }
+
   case OP_RINGBUF:
   {
     struct vm_event *e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
@@ -188,25 +207,28 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
       e->caller_pid = bpf_get_current_pid_tgid() >> 32;
       e->type = vm->type;
       bpf_get_current_comm(e->caller_name, sizeof(e->caller_name));
+
       for (int i = 0; i < VM_NUM_REGS; i++)
       {
         e->reg_values[i] = vm->regs[i];
       }
+
       e->pc = vm->pc;
       bpf_ringbuf_submit(e, 0);
     }
     break;
   }
+
   case OP_LOAD_SP:
-    vm->regs[inst->dst] = (unsigned long long)&vm->stack[vm->sp];
+    vm->regs[inst.dst] = (unsigned long long)&vm->stack[vm->sp];
     break;
+
   case OP_SET_SP:
-    vm->sp += inst->val;
+    vm->sp += inst.val;
     break;
 
   default:
-    // unknown op
-    bpf_printk("Unknow op %i at pc=", inst->op, vm->pc);
+    bpf_printk("Unknown op %i at pc=", inst.op, vm->pc);
     return vm_error(vm);
   }
 
@@ -223,10 +245,12 @@ static int vm_error(struct vm_state *vm)
     e->type = VM_ERROR;
     e->pc = vm->pc;
     bpf_get_current_comm(e->caller_name, sizeof(e->caller_name));
+
     for (int i = 0; i < VM_NUM_REGS; i++)
     {
       e->reg_values[i] = vm->regs[i];
     }
+
     bpf_ringbuf_submit(e, 0);
   }
   return 1;

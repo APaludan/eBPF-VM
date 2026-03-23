@@ -67,10 +67,18 @@ int vm_handler::LoadAndAttachAll(pid_t protected_pid)
 
   bpf_map *map_fd = skel_obj.get()->maps.ptrace_instructions;
 
-  for (uint32_t i = 0; i < ptrace_program.size(); i++)
-  {
-    bpf_map__update_elem(map_fd, &i, sizeof(i), &ptrace_program[i], sizeof(ptrace_program[i]), 0);
-  }
+for (uint32_t i = 0; i < ptrace_program.size(); i++)
+{
+    vm_inst inst = ptrace_program[i];
+
+    __u8 key = 0x5A ^ i;  // per-instruction key
+
+    xor_rolling(reinterpret_cast<uint8_t*>(&inst), sizeof(inst), key);
+
+    bpf_map__update_elem(map_fd, &i, sizeof(i),
+                         &inst,
+                         sizeof(inst), 0);
+}
 
   const auto proc_super_magic_num = 0x9fa0;
   unsigned long long maps = 0;
@@ -128,10 +136,17 @@ int vm_handler::LoadAndAttachAll(pid_t protected_pid)
   map_fd = skel_obj.get()->maps.lsm_open_instructions;
 
   for (uint32_t i = 0; i < lsm_open_program.size(); i++)
-  {
-    bpf_map__update_elem(map_fd, &i, sizeof(i), &lsm_open_program[i], sizeof(lsm_open_program[i]), 0);
-  }
+{
+    vm_inst inst = lsm_open_program[i];
 
+    __u8 key = 0x5A ^ i; // per-instruction-key
+
+    xor_rolling(reinterpret_cast<uint8_t*>(&inst), sizeof(inst), key);
+
+    bpf_map__update_elem(map_fd, &i, sizeof(i),
+                         &inst,
+                         sizeof(inst), 0);
+}
   loop_thread = std::jthread([this](std::stop_token st)
                              {
     while (!st.stop_requested()) {
