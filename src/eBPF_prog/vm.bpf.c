@@ -123,22 +123,22 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
   case OP_CALL:
     switch (inst.val)
     {
-    case 14:
-      vm->regs[0] = ((long (*)(void))(long)inst.val)();
-      break;
+      case 14:
+        vm->regs[0] = ((long (*)(void))(long)inst.val)();
+        break;
 
-    case 16:
-      if (vm->sp + TASK_COMM_LEN > VM_STACK_SIZE)
+      case 16:
+        if (vm->sp + TASK_COMM_LEN > VM_STACK_SIZE)
+          return vm_error(vm);
+
+        vm->regs[0] =
+            ((long (*const)(void *, unsigned int))(long)inst.val)(
+                (void *)&vm->stack[vm->sp], TASK_COMM_LEN);
+        break;
+
+      default:
+        bpf_printk("call failed, id: %llu", inst.val);
         return vm_error(vm);
-
-      vm->regs[0] =
-          ((long (*const)(void *, unsigned int))(long)inst.val)(
-              (void *)&vm->stack[vm->sp], TASK_COMM_LEN);
-      break;
-
-    default:
-      bpf_printk("call failed, id: %llu", inst.val);
-      return vm_error(vm);
     }
     break;
 
@@ -172,12 +172,12 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
 
   case OP_READ:
   {
-      long long val = inst.val;
-      if (val <= 0 || val > 230) {
-          return vm_error(vm);
-      }
+    long long val = inst.val;
+    if (val <= 0 || val > 230) {
+        return vm_error(vm);
+    }
 
-      unsigned int size = (unsigned int)val;
+    unsigned int size = (unsigned int)val;
 
     vm->regs[0] = bpf_probe_read_kernel(&vm->regs[inst.dst],
                                         size,
