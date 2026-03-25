@@ -1,4 +1,5 @@
 #include "vm_agent.h"
+#include "vm_inst.h"
 #include <iostream>
 #include <signal.h>
 
@@ -15,7 +16,7 @@ int main(int argc, char *argv[]) {                                              
   pid_t protected_pid = (argc > 1) ? static_cast<pid_t>(std::stoi(argv[1]))                   // Declare protected pid: pid_t = signed interger type for pid's, static_cast <dest> (src) = convert src type to dst type (cannot cast char* to pid_t therfore need std::stoi to convert argumen (which is char*) to type int first)
                                    : static_cast<pid_t>(1);                                   // Check if argument counter is above 1 (pid given is arg 2) if so set it to the 2nd argument else set it to 1
 
-  vm_agent agent = vm_agent(protected_pid);                                                   // Initialize a vm_agent for the protected pid 
+  vm_agent agent = vm_agent(protected_pid, make_ptrace_program(protected_pid), make_lsm_open_program(protected_pid)); 
 
   std::cout << "\n========================================================" << std::endl;     // Teminal msg's: uses cout (output) and endl (newline) provided by iostream
   std::cout << "Check the trace pipe in a new terminal:" << std::endl;                        //

@@ -15,7 +15,7 @@ private:                                                // Functions and variabl
   std::mutex queue_mutex;                               // Mutal exclusion for event_queue (key to access queue)
 
 public:                                                 // Functions and variable available for all that include vm_agent.h
-  vm_agent(pid_t protected_pid);                        // constructor for the vm_agent class, takes a pid as input 
+  vm_agent(pid_t protected_pid, std::vector<vm_inst>, std::vector<vm_inst>);  // constructor for the vm_agent class, takes a pid as input 
   ~vm_agent();                                          // Deconstructor for the vm_agent class
 
   vm_agent(const vm_agent &) = delete;                  // disable copuing and moving of the vm_agent class

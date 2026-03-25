@@ -4,6 +4,7 @@
 #include <functional>
 #include <thread>
 
+
 class vm_handler {
 private:                                                                                                // Functions and variable available for vm_handler
 
@@ -20,7 +21,7 @@ public:                                                                         
   explicit vm_handler(std::function<void(vm_event)> on_event);                                          // vm_handler class constructor 
   ~vm_handler();                                                                                        // vm_handler class deconstructor 
 
-  int load_and_attach_all(pid_t protected_pid);                                                         // Function to load and attach vm_handler class to a given pid
+  int load_and_attach_all(std::vector<vm_inst>, std::vector<vm_inst>);                                                         // Function to load and attach vm_handler class to a given pid
   void detach_and_unload_all();                                                                         // Function to detach and unload the vm_handler class
 
 };

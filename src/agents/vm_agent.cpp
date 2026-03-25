@@ -4,11 +4,11 @@
 
 //std::string_view event_type_to_string(vm_event_type type);                        // (Redundant, moved above only function that uses it: print_event_data)Declare helper function to convert event types to string
 
-vm_agent::vm_agent(pid_t protected_pid)                                             // vm_agent class constructor 
+vm_agent::vm_agent(pid_t protected_pid, std::vector<vm_inst> ptrace_program, std::vector<vm_inst> lsm_open_program) // vm_agent class constructor 
     : handler([this](const vm_event &e) { on_event_cb(e); })                        // member init list(runs before constuctor body): init handler vaiable (declared in vm_agent.h) with a lambda function that campure the context of the constructed vm_agent, the lambda function takes a referance to a vm_event and call the function on_event_cb (Lambda function is not called as handler is init but when the handler recives an vm_event e)
-{                                                                                           
+{   
     this->protected_pid = protected_pid;                                            // Set the private vaiable of this current vm_agent protected_pid to the protected_pid passed to the constructor 
-    handler.load_and_attach_all(protected_pid);                                     // Call handler helper function 
+    handler.load_and_attach_all(ptrace_program, lsm_open_program);                  // Call handler helper function 
 }
 
 vm_agent::~vm_agent()                                                               // Deconstructor of the vm_agent class
