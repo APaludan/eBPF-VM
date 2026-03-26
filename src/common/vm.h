@@ -44,6 +44,11 @@
 #define VM_STACK_SIZE 256
 #define VM_NUM_REGS 10
 
+#define MAX_PROGRAMS 2
+#define PTRACE_PROGRAM 0
+#define LSM_OPEN_PROGRAM 1
+
+
 enum vm_event_type
 {
   ANY = 0,
