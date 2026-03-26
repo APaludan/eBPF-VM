@@ -12,35 +12,35 @@
 static long vm_callback_fn(unsigned int nr_loops, void *ctx);
 static int vm_error(struct vm_state *vm);
 
+//==========================================
+//====          MAP STRUCTURES          ====
+//==========================================
+
 struct
 {
   __uint(type, BPF_MAP_TYPE_RINGBUF);
-  __uint(max_entries, 256 * sizeof(struct vm_event));
+  __uint(max_entries, 256 * sizeof(struct vm_event)); 
 } rb SEC(".maps");
 
 struct
 {
   __uint(type, BPF_MAP_TYPE_ARRAY);
-  __uint(max_entries, VM_MAX_INSTRUCTIONS * sizeof(struct vm_inst));
+  __uint(max_entries, VM_MAX_INSTRUCTIONS * MAX_PROGRAMS);
   __type(key, unsigned int);
   __type(value, struct vm_inst);
-} ptrace_instructions SEC(".maps");
+} programs SEC(".maps");
 
-struct
-{
-  __uint(type, BPF_MAP_TYPE_ARRAY);
-  __uint(max_entries, VM_MAX_INSTRUCTIONS * sizeof(struct vm_inst));
-  __type(key, unsigned int);
-  __type(value, struct vm_inst);
-} lsm_open_instructions SEC(".maps");
+//==========================================
+//====            HOOK POINTS           ====
+//==========================================
 
 SEC("tp/syscalls/sys_enter_ptrace")
 int ebpf_vm_interpreter(struct trace_event_raw_sys_enter *ctx)
 {
   struct vm_state vm = {0};
-  vm.type = PTRACE2;
+
+  vm.type = PTRACE_PROGRAM;
   vm.data = (void *)ctx;
-  vm.map = &ptrace_instructions;
 
   bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
@@ -51,25 +51,32 @@ SEC("lsm/file_open")
 int BPF_PROG(restrict_proc_access, struct file *file)
 {
   struct vm_state vm = {0};
-  vm.type = OPEN2;
+
+  vm.type = LSM_OPEN_PROGRAM;
   vm.data = (void *)file;
-  vm.map = &lsm_open_instructions;
 
   bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
   return 0; // remove when vm prog works correctly
 
   int ret = (int)vm.regs[0];
-
   return (ret == 0) ? 0 : -EPERM;
 }
+
+//==========================================
+//====             VM LOGIC             ====
+//==========================================
 
 static long vm_callback_fn(unsigned int nr_loops, void *ctx)
 {
   struct vm_state *vm = (struct vm_state *)ctx;
 
-  // Fetch encrypted instruction
-  struct vm_inst *inst_ptr = bpf_map_lookup_elem(vm->map, &vm->pc);
+  // Fetch encrypted instruction (uses defined vm type in hook point logic to get the right instruction in programs map)
+  // PTRACE_PROGRAM = 0 (defined in vm.h) has the first VM_MAX_INSTRUCTIONS entries of the map
+  // LSM_OPEN_PROGRAM = 1 (defined in vm.h) has the entries after the first VM_MAX_INSTRUCTIONS entries of the map
+  unsigned int program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc; 
+  struct vm_inst *inst_ptr = bpf_map_lookup_elem(&programs, &program_index_pc);
+
   if (!inst_ptr)
     return vm_error(vm);
 
@@ -77,7 +84,6 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
   struct vm_inst inst = *inst_ptr;
 
   __u8 key = 0x5A;
-
   xor_rolling((__u8 *)&inst, sizeof(inst), key);
 
   if (inst.dst >= VM_NUM_REGS || (inst.src >= VM_NUM_REGS && inst.op != OP_READ_CTX))

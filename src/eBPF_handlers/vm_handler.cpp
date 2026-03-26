@@ -52,30 +52,28 @@ int vm_handler::load_and_attach_all(std::vector<vm_inst> ptrace_program, std::ve
 //======                                                  INSTRUCTION SET START                                                =======
 //====================================================================================================================================
 
-  bpf_map *map_fd = skel_obj.get()->maps.ptrace_instructions;                         // create a map file decriptor for the ptrace instructions
+  bpf_map *map_fd = skel_obj.get()->maps.programs;                                    // create a map file decriptor for what map to store instuctions
 
   for (uint32_t i = 0; i < ptrace_program.size(); i++)                                // for each instruction in ptrace program 
   {
     vm_inst inst = ptrace_program[i];                                                 // set the curret ptrace instruction
 
     __u8 key = 0x5A;                                                                  // encryption key
-
     xor_rolling(reinterpret_cast<uint8_t*>(&inst), sizeof(inst), key);                // call xor_rolling defined in vm.h
 
-    bpf_map__update_elem(map_fd, &i, sizeof(i), &inst, sizeof(inst), 0);              // update the map 
+    uint32_t program_index_i = PTRACE_PROGRAM * VM_MAX_INSTRUCTIONS + i;
+    bpf_map__update_elem(map_fd, &program_index_i, sizeof(program_index_i), &inst, sizeof(inst), 0);  // update the map 
   }
-
-  map_fd = skel_obj.get()->maps.lsm_open_instructions;                                // set map filedescriptor ot lsm_open instructions
 
   for (uint32_t i = 0; i < lsm_open_program.size(); i++)                              // for each instruction in lsm_open
   {
     vm_inst inst = lsm_open_program[i];                                               // set inst as curret instruction
 
     __u8 key = 0x5A;                                                                  // encryption key
-
     xor_rolling(reinterpret_cast<uint8_t*>(&inst), sizeof(inst), key);                // call helper function from vm.h
 
-    bpf_map__update_elem(map_fd, &i, sizeof(i), &inst, sizeof(inst), 0);              // update the lsm_open map
+    uint32_t program_index_i = LSM_OPEN_PROGRAM * VM_MAX_INSTRUCTIONS + i;
+    bpf_map__update_elem(map_fd, &program_index_i, sizeof(program_index_i), &inst, sizeof(inst), 0);  // update the map
   }
 
 //====================================================================================================================================
