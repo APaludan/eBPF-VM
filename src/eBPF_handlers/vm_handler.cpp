@@ -71,8 +71,10 @@ int vm_handler::load_and_attach_all(std::unordered_map<int, std::vector<vm_inst>
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<unsigned int> key_dist(0, std::numeric_limits<unsigned int>::max());
-    unsigned int key = key_dist(gen);
+    std::uniform_int_distribution<int> key_dist(
+        std::numeric_limits<int>::min(),
+        std::numeric_limits<int>::max());
+    int key = key_dist(gen);
     unsigned int index = 0;
     bpf_map__update_elem(skel_obj->maps.key_map, &index, sizeof(index), &key, sizeof(key), 0);
 

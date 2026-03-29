@@ -41,7 +41,7 @@
 #define VM_MAX_INSTRUCTIONS 10000
 #define VM_MAX_LOOPS 100000
 #define VM_STACK_SIZE 256
-#define VM_NUM_REGS 10
+#define VM_NUM_REGS 16
 
 #define MAX_PROGRAMS 2
 #define PTRACE_PROGRAM 0
@@ -90,30 +90,17 @@ struct vm_state
     enum vm_event_type type;
 };
 
-static inline uint8_t next_key(uint8_t *current)
+static inline int next_key(int *current)
 {
     *current = *current + 7;
     return *current;
 }
 
-static inline void xor_rolling(struct vm_inst *data, uint8_t key)
+static inline void xor_rolling(struct vm_inst *data, int key)
 {
-    // data->op ^= (unsigned short)next_key(&key);
-    data->op ^= (unsigned short)next_key(&key) << 0;
-    data->op ^= (unsigned short)next_key(&key) << 8;
-
-    data->dst ^= (unsigned short)next_key(&key) << 0;
-    data->dst ^= (unsigned short)next_key(&key) << 7;
-
-    data->val ^= (long long)next_key(&key) << 0;
-    data->val ^= (long long)next_key(&key) << 8;
-    data->val ^= (long long)next_key(&key) << 16;
-    data->val ^= (long long)next_key(&key) << 24;
+    data->op ^= (unsigned short)next_key(&key);
+    data->dst ^= (unsigned short)next_key(&key) >> 1;
+    data->val ^= (long long)next_key(&key);
     data->val ^= (long long)next_key(&key) << 32;
-    data->val ^= (long long)next_key(&key) << 40;
-    data->val ^= (long long)next_key(&key) << 48;
-    data->val ^= (long long)next_key(&key) << 56;
-
-    data->src ^= (unsigned short)next_key(&key) << 0;
-    data->src ^= (unsigned short)next_key(&key) << 7;
+    data->src ^= (unsigned short)next_key(&key) >> 1;
 }

@@ -22,4 +22,4 @@ debug:
 	@sudo cat /sys/kernel/tracing/trace_pipe
 
 test:
-	@cd $(BUILD_DIR) && ctest --output-on-failure
+	@cd $(BUILD_DIR) && ctest --output-on-failure --debug

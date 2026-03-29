@@ -27,7 +27,7 @@ struct
     __uint(type, BPF_MAP_TYPE_ARRAY);
     __uint(max_entries, 1);
     __type(key, unsigned int);
-    __type(value, unsigned int);
+    __type(value, int);
 } key_map SEC(".maps");
 
 struct
@@ -94,10 +94,10 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
 
     // get key and decode instruction
     unsigned int index = 0;
-    unsigned int *key_ptr = bpf_map_lookup_elem(&key_map, &index);
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &index);
     if (key_ptr == NULL)
-        return vm_error(vm);
-    unsigned int key = *key_ptr;
+    return vm_error(vm);
+    int key = *key_ptr;
     xor_rolling(&inst, key);
 
     // just some checks to make verifier happy
