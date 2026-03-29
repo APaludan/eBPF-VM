@@ -1,18 +1,12 @@
 #include "vm_agent.h"
 #include <iostream>
-#include <optional>
 
-vm_agent::vm_agent(pid_t protected_pid, std::vector<vm_inst> ptrace_program, std::vector<vm_inst> lsm_open_program)
-    : handler([this](const vm_event &e)
-              { on_event_cb(e); })
+vm_agent::vm_agent(std::unordered_map<int, std::vector<vm_inst>> program_map)      
+    : handler([this](const vm_event &e) { on_event_cb(e); })
 {
-    this->protected_pid = protected_pid;
-    handler.load_and_attach_all(ptrace_program, lsm_open_program);
+    handler.load_and_attach_all(program_map);
 }
 
-vm_agent::~vm_agent()
-{
-}
 
 void vm_agent::on_event_cb(const vm_event &e)
 {

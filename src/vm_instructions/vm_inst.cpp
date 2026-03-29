@@ -1,10 +1,27 @@
 #include "vm_inst.h"
 
-//============================
-//==     PTRACE PROGRAM     ==
-//============================
+std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid);
+std::vector<vm_inst> make_ptrace_program(pid_t protected_pid);
 
-std::vector<vm_inst> make_ptrace_program(pid_t protected_pid) // function to create vector with instusction, same functionality as mem_access ptrace ebpf program
+
+
+
+std::unordered_map<int, std::vector<vm_inst>> generate_programs(pid_t protected_pid)
+{
+  std::unordered_map<int, std::vector<vm_inst>> program_map; 
+
+  program_map[PTRACE_PROGRAM] = make_ptrace_program(protected_pid);
+  program_map[LSM_OPEN_PROGRAM] = make_lsm_open_program(protected_pid);
+
+  return program_map;
+}
+
+
+
+
+
+// function to create vector with instusction, same functionality as mem_access ptrace ebpf program
+std::vector<vm_inst> make_ptrace_program(pid_t protected_pid) 
 {
     return {
         vm_inst{OP_LOAD, 1, 0, protected_pid},      // 00) r1 = protected_pid
@@ -19,21 +36,20 @@ std::vector<vm_inst> make_ptrace_program(pid_t protected_pid) // function to cre
     };
 };
 
-//============================
-//==    LSM_OPEN PROGRAM    ==
-//============================
 
-std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid) // vm_inst(op, dst, src, val)
+
+std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid)
 {
-    const auto proc_super_magic_num = 0x9fa0; // define consts used for the lsm_open program
-    unsigned long long maps = 0;              //
-    unsigned long long smaps = 0;             //
-    unsigned long long mem = 0;               //
-    memcpy(&maps, "maps", 5);                 //
-    memcpy(&smaps, "smaps", 6);               //
-    memcpy(&mem, "mem", 4);
-
-    return {
+  const auto proc_super_magic_num = 0x9fa0; // define consts used for the lsm_open program
+  unsigned long long maps = 0;              //
+  unsigned long long smaps = 0;             //
+  unsigned long long mem = 0;               //
+  memcpy(&maps, "maps", 5);                 //
+  memcpy(&smaps, "smaps", 6);               //
+  memcpy(&mem, "mem", 4);
+  
+  return {
+      // vm_inst(op, dst, src, val)
         vm_inst{OP_LOAD, 1, 0, protected_pid}, // 01) r1 = protected_pid, 0
         vm_inst{OP_CALL, 2, 0, 14},            // 02) bpf_get_current_pid_tgid, 1
         vm_inst{OP_RSHIFT, 2, 2, 32},          // 03) r2 = pid, 2

@@ -4,7 +4,7 @@
 #include "vm.h"
 
 
-TEST(EncryptionTests, XorInstruction) {
+TEST(EncodingTests, XorInstruction) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<unsigned int> key_dist(0, std::numeric_limits<unsigned int>::max());

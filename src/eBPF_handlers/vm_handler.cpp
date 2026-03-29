@@ -9,9 +9,9 @@
 #include <random>
 
 // Ringbuffer callback function, used to call the lampda function when an event arrives
-int vm_handler::ring_buffer_callback(void *ctx, void *data, size_t data_sz)
+int vm_handler::ring_buffer_callback(void *ctx, void *data, size_t data_size)
 {
-    if (data_sz != sizeof(vm_event))
+    if (data_size != sizeof(vm_event))
     {
         std::cerr << "Size mitch match in event" << std::endl;
         return -1;
@@ -26,7 +26,22 @@ int vm_handler::ring_buffer_callback(void *ctx, void *data, size_t data_sz)
     return 0;
 }
 
-int vm_handler::load_and_attach_all(std::vector<vm_inst> ptrace_program, std::vector<vm_inst> lsm_open_program)
+int vm_handler::populate_map(int program_type, std::vector<vm_inst> program, bpf_map *map_fd, unsigned int key)
+{
+    for (uint32_t i = 0; i < program.size(); i++)
+    {
+        vm_inst inst = program[i];
+
+        xor_rolling(&inst, key);
+
+        uint32_t program_index_i = program_type * VM_MAX_INSTRUCTIONS + i;
+        bpf_map__update_elem(map_fd, &program_index_i, sizeof(program_index_i), &inst, sizeof(inst), 0);
+    }
+
+    return 0;
+}
+
+int vm_handler::load_and_attach_all(std::unordered_map<int, std::vector<vm_inst>> program_map)
 {
     if (!on_event)
     {
@@ -62,26 +77,10 @@ int vm_handler::load_and_attach_all(std::vector<vm_inst> ptrace_program, std::ve
     bpf_map__update_elem(skel_obj->maps.key_map, &index, sizeof(index), &key, sizeof(key), 0);
 
     auto map_fd = skel_obj->maps.programs;
-
-    for (size_t i = 0; i < ptrace_program.size(); i++)
-    {
-        vm_inst inst = ptrace_program[i];
-
-        xor_rolling(&inst, key);
-
-        uint32_t program_index_i = PTRACE_PROGRAM * VM_MAX_INSTRUCTIONS + i;
-        bpf_map__update_elem(map_fd, &program_index_i, sizeof(program_index_i), &inst, sizeof(inst), 0);
+    for (auto i : program_map) {
+        populate_map(i.first, i.second, map_fd, key);
     }
 
-    for (size_t i = 0; i < lsm_open_program.size(); i++)
-    {
-        vm_inst inst = lsm_open_program[i];
-
-        xor_rolling(&inst, key);
-
-        uint32_t program_index_i = LSM_OPEN_PROGRAM * VM_MAX_INSTRUCTIONS + i;
-        bpf_map__update_elem(map_fd, &program_index_i, sizeof(program_index_i), &inst, sizeof(inst), 0);
-    }
 
     //====================================================================================================================================
     //======                                                  INSTRUCTION SET ENDS                                                 =======
@@ -114,7 +113,7 @@ vm_handler::vm_handler(std::function<void(vm_event)> cb)
 }
 
 // helper function for the deconstructor
-void vm_handler::detach_and_unload_all() 
+void vm_handler::detach_and_unload_all()
 {
 
     if (loop_thread.joinable())

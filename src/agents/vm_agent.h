@@ -8,7 +8,6 @@ class vm_agent
 {
 private:
     vm_handler handler;
-    pid_t protected_pid;
 
     void on_event_cb(const vm_event &e);
 
@@ -16,13 +15,7 @@ private:
     std::mutex queue_mutex;
 
 public:
-    vm_agent(pid_t protected_pid, std::vector<vm_inst>, std::vector<vm_inst>);
-    ~vm_agent();
-
-    vm_agent(const vm_agent &) = delete;
-    vm_agent &operator=(const vm_agent &) = delete;
-    vm_agent(const vm_agent &&) = delete;
-    vm_agent &operator=(const vm_agent &&) = delete;
+    vm_agent(std::unordered_map<int, std::vector<vm_inst>>);
 
     std::optional<vm_event> get_next_event();
     void print_event_data(const vm_event &e);

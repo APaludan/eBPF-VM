@@ -16,7 +16,7 @@ clean:
 	@echo "Build directory cleaned." 
 
 run:
-	@sudo $(BUILD_DIR)/TyrSecure
+	@sudo $(BUILD_DIR)/eBPF_VM
 
 debug:
 	@sudo cat /sys/kernel/tracing/trace_pipe

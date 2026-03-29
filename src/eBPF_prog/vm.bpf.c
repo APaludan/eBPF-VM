@@ -82,6 +82,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     // Fetch encrypted instruction (uses defined vm type in hook point logic to get the right instruction in programs map)
     // PTRACE_PROGRAM = 0 (defined in vm.h) has the first VM_MAX_INSTRUCTIONS entries of the map
     // LSM_OPEN_PROGRAM = 1 (defined in vm.h) has the entries after the first VM_MAX_INSTRUCTIONS entries of the map
+    // TODO: make more memory effecient a lot of unused slots atm
     unsigned int program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc;
     struct vm_inst *inst_ptr = bpf_map_lookup_elem(&programs, &program_index_pc);
 
@@ -101,9 +102,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
 
     // just some checks to make verifier happy
     if (inst.dst >= VM_NUM_REGS ||
-        (inst.src >= VM_NUM_REGS && inst.op != OP_READ_CTX) ||
-        inst.dst < 0 ||
-        inst.src < 0)
+        (inst.src >= VM_NUM_REGS && inst.op != OP_READ_CTX))
         return vm_error(vm);
 
     switch (inst.op)

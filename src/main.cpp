@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     pid_t protected_pid = (argc > 1) ? static_cast<pid_t>(std::stoi(argv[1]))
                                      : static_cast<pid_t>(1);
 
-    vm_agent agent = vm_agent(protected_pid, make_ptrace_program(protected_pid), make_lsm_open_program(protected_pid));
+    vm_agent agent = vm_agent(generate_programs(protected_pid));
 
     std::cout << "\n_______________________________________" << std::endl;
     std::cout << "Check the trace pipe in a new terminal:" << std::endl;
