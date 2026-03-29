@@ -3,15 +3,20 @@
 #include <limits>
 #include "vm.h"
 
+template<typename T>
+T random_value() {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_int_distribution<T> key_dist(
+        std::numeric_limits<T>::min(),
+        std::numeric_limits<T>::max());
+
+    return key_dist(gen);
+}
+
 TEST(EncodingTests, XorInstruction1)
 {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> key_dist(
-        std::numeric_limits<int>::min(),
-        std::numeric_limits<int>::max());
-
-    int key = key_dist(gen);
+    auto key = random_value<int>();
 
     unsigned short original_op = OP_CALL;
     unsigned short original_dst = 2;
@@ -41,13 +46,7 @@ TEST(EncodingTests, XorInstruction1)
 
 TEST(EncodingTests, XorInstruction2)
 {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> key_dist(
-        std::numeric_limits<int>::min(),
-        std::numeric_limits<int>::max());
-
-    int key = key_dist(gen);
+    auto key = random_value<int>();
 
     unsigned short original_op = OP_LOAD;
     unsigned short original_dst = 1;
@@ -77,13 +76,7 @@ TEST(EncodingTests, XorInstruction2)
 
 TEST(EncodingTests, XorInstruction3)
 {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> key_dist(
-        std::numeric_limits<int>::min(),
-        std::numeric_limits<int>::max());
-
-    int key = key_dist(gen);
+    auto key = random_value<int>();
 
     unsigned short original_op = OP_LOAD;
     unsigned short original_dst = 1;
