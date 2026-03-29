@@ -18,3 +18,10 @@ find_program(BPFT_TOOL bpftool)
 if(NOT BPFT_TOOL)
   message(FATAL_ERROR "bpftool is required to generate skeleton headers")
 endif()
+
+
+# Check for ccache
+find_program(CCACHE ccache)
+if(NOT CCACHE)
+  message(FATAL_ERROR "ccache is required to build. Install with:\n sudo pacman -S ccache")
+endif()
