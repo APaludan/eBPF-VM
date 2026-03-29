@@ -96,7 +96,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     unsigned int index = 0;
     int *key_ptr = bpf_map_lookup_elem(&key_map, &index);
     if (key_ptr == NULL)
-    return vm_error(vm);
+        return vm_error(vm);
     int key = *key_ptr;
     xor_rolling(&inst, key);
 
