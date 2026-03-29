@@ -1,13 +1,6 @@
-#message(STATUS "======================================")
-#message(STATUS "Performing environment check")
-#message(STATUS "======================================")
-
-# Ensures it's on Linux
 if(NOT UNIX)
-  message(FATAL_ERROR "AeBPF only supports Linux.")
+  message(FATAL_ERROR "eBPF only supports Linux.")
 endif()
-#message(STATUS "Environment is Linux")
-# ##############################################################################
 
 
 # Check for CLang compiler
@@ -19,16 +12,9 @@ if(NOT CLANG_EXECUTABLE)
       "clang is required to build eBPF programs, but was not found in PATH")
 endif()
 
-#message(STATUS "Found clang: ${CLANG_EXECUTABLE}")
-
-find_program(BPFT_TOOL bpftool)
 
 # Check for BPFTool
+find_program(BPFT_TOOL bpftool)
 if(NOT BPFT_TOOL)
   message(FATAL_ERROR "bpftool is required to generate skeleton headers")
 endif()
-
-#message(STATUS "Found bpftool: ${BPFT_TOOL}")
-
-#message(STATUS "")
-# ##############################################################################

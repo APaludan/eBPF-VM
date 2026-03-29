@@ -2,38 +2,36 @@
 #include <iostream>
 #include <optional>
 
-//std::string_view event_type_to_string(vm_event_type type);                        // (Redundant, moved above only function that uses it: print_event_data)Declare helper function to convert event types to string
-
-vm_agent::vm_agent(pid_t protected_pid, std::vector<vm_inst> ptrace_program, std::vector<vm_inst> lsm_open_program) // vm_agent class constructor 
-    : handler([this](const vm_event &e) { on_event_cb(e); })                        // member init list(runs before constuctor body): init handler vaiable (declared in vm_agent.h) with a lambda function that campure the context of the constructed vm_agent, the lambda function takes a referance to a vm_event and call the function on_event_cb (Lambda function is not called as handler is init but when the handler recives an vm_event e)
-{   
-    this->protected_pid = protected_pid;                                            // Set the private vaiable of this current vm_agent protected_pid to the protected_pid passed to the constructor 
-    handler.load_and_attach_all(ptrace_program, lsm_open_program);                  // Call handler helper function 
-}
-
-vm_agent::~vm_agent()                                                               // Deconstructor of the vm_agent class
-{  
-
-}
-
-void vm_agent::on_event_cb(const vm_event &e)                                       // Callback function that is called when handler receives an event 
+vm_agent::vm_agent(pid_t protected_pid, std::vector<vm_inst> ptrace_program, std::vector<vm_inst> lsm_open_program)
+    : handler([this](const vm_event &e)
+              { on_event_cb(e); })
 {
-    std::lock_guard<std::mutex> lock(queue_mutex);                                  // Request mutex for the event_queue
-    event_queue.push(e);                                                            // Push the event recieved to the event_queue 
+    this->protected_pid = protected_pid;
+    handler.load_and_attach_all(ptrace_program, lsm_open_program);
 }
 
-std::optional<vm_event> vm_agent::get_next_event()                                  // Optional function (can return an event or null) to get next event in event_queue
+vm_agent::~vm_agent()
 {
-    std::lock_guard<std::mutex> lock(queue_mutex);                                  // Request mustex for the event_queue                          
-    if (event_queue.empty())                                                        // Use <queue> helper function to check if the event_queue is empty
-        return std::nullopt;                                                        // The optional null is returned
-    auto e = event_queue.front();                                                   // Initialise variable e as the front event of the event_queue
-    event_queue.pop();                                                              // Pop the front event of the event_queue (the one stored in variable e)
-    return e;                                                                       // Return the front vm_event e
 }
 
+void vm_agent::on_event_cb(const vm_event &e)
+{
+    std::lock_guard<std::mutex> lock(queue_mutex);
+    event_queue.push(e);
+}
 
-std::string_view event_type_to_string(vm_event_type type)                           // Helper function for print_event_data to convert vm_event.type to a string
+std::optional<vm_event> vm_agent::get_next_event()
+{
+    std::lock_guard<std::mutex> lock(queue_mutex);
+    if (event_queue.empty())
+        return std::nullopt;
+    auto e = event_queue.front();
+    event_queue.pop();
+    return e;
+}
+
+// convert vm_event.type to a string
+std::string_view event_type_to_string(vm_event_type type) 
 {
     switch (type)
     {
@@ -58,11 +56,11 @@ std::string_view event_type_to_string(vm_event_type type)                       
     }
 }
 
-void vm_agent::print_event_data(const vm_event &e)                                  // Helper function to print event data in terminal
+void vm_agent::print_event_data(const vm_event &e) 
 {
 
     std::cout << "====== VM Event ======\n";
-    std::cout << "Caller name     : " << e.caller_name << "\n";                         
+    std::cout << "Caller name     : " << e.caller_name << "\n";
     std::cout << "PID             : " << e.caller_pid << "\n";
     std::cout << "Regs            : ";
     for (const auto &val : e.reg_values)
@@ -71,27 +69,6 @@ void vm_agent::print_event_data(const vm_event &e)                              
     }
     std::cout << "\n";
     std::cout << "PC              : " << e.pc << "\n";
-    std::cout << "Event type      : " << event_type_to_string(e.type) << "\n";        
+    std::cout << "Event type      : " << event_type_to_string(e.type) << "\n";
     std::cout << "======================\n";
 }
-
-
-/* 
-=========================
-==      NOT USED      ===
-=========================
-
-void vm_agent::set_protected_pid(pid_t protected_pid)                               // Function to change the protected_pid
-{
-    this->protected_pid = protected_pid;
-    handler.DetachAndUnloadAll();
-    handler.LoadAndAttachAll(protected_pid);
-}
-
-int vm_agent::get_pid_id()                                                          // Function to get the private variable of vm_agent class
-{  
-    return protected_pid;                                                          
-}
-
-
-*/ 
