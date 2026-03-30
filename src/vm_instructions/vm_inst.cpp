@@ -2,32 +2,27 @@
 
 std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid);
 std::vector<vm_inst> make_ptrace_program(pid_t protected_pid);
-
-
-
+std::vector<vm_inst> make_lsm_bpf_program();
 
 std::unordered_map<int, std::vector<vm_inst>> generate_programs(pid_t protected_pid)
 {
-  std::unordered_map<int, std::vector<vm_inst>> program_map; 
+    std::unordered_map<int, std::vector<vm_inst>> program_map;
 
-  program_map[PTRACE_PROGRAM] = make_ptrace_program(protected_pid);
-  program_map[LSM_OPEN_PROGRAM] = make_lsm_open_program(protected_pid);
+    program_map[PTRACE_PROGRAM] = make_ptrace_program(protected_pid);
+    program_map[LSM_OPEN_PROGRAM] = make_lsm_open_program(protected_pid);
+    program_map[LSM_BPF_PROGRAM] = make_lsm_bpf_program();
 
-  return program_map;
+    return program_map;
 }
 
-
-
-
-
 // function to create vector with instusction, same functionality as mem_access ptrace ebpf program
-std::vector<vm_inst> make_ptrace_program(pid_t protected_pid) 
+std::vector<vm_inst> make_ptrace_program(pid_t protected_pid)
 {
     return {
         vm_inst{OP_LOAD, 1, 0, protected_pid},      // 00) r1 = protected_pid
         vm_inst{OP_CALL, 0, 0, 14},                 // 01) call bpf_get_current_pid_tgid (nr 14)
         vm_inst{OP_RSHIFT, 0, 0, 32},               // 02) = r0 >> 32 (extract PID only)
-        vm_inst{OP_READ_CTX, 2, 24, sizeof(pid_t)}, // 03) read the target pid from ctx + offset 24 = (ctx->args[1])
+        vm_inst{OP_READ_CTX, 2, 0, sizeof(pid_t), 24}, // 03) read the target pid from ctx + offset 24 = (ctx->args[1])
 
         vm_inst{OP_JNEQ, 1, 2, 2},    // 04) if r1(protected pid) != r2(target pid): jump to exit (pc +2)
         vm_inst{OP_RINGBUF, 0, 0, 0}, // 05) submit info to ringbuf
@@ -36,27 +31,62 @@ std::vector<vm_inst> make_ptrace_program(pid_t protected_pid)
     };
 };
 
+// block some bpf syscalls
+// prevents usage of: `bpftool prog list`, `bpftool link list`, `bpftool map list`
+// TODO: make it even more specific so it only block access to our programs/maps/links
+std::vector<vm_inst> make_lsm_bpf_program()
+{
+    const pid_t pid = getpid();
+    // kan findes i vmlinux.h -> enum bpf_cmd
+    const int cmd_prog_get_next_id = 11;
+    const int cmd_link_get_next_id = 31;
+    const int cmd_map_get_next_id = 12;
+    const int cmd_link_detach = 34;
 
+    return {
+        //vm_inst{OP_EXIT, 0, 0, 0},
+        vm_inst{OP_LOAD, 1, 0, pid},
+        vm_inst{OP_CALL, 0, 0, 14},   // bpf_get_current_pid_tgid
+        vm_inst{OP_RSHIFT, 0, 0, 32}, // r0 = pid
+        vm_inst{OP_JNEQ, 1, 0, 3},
+        vm_inst{OP_LOAD, 0, 0, 0},
+        vm_inst{OP_EXIT, 0, 0, 0},
+
+        vm_inst{OP_LOAD, 1, 0, cmd_prog_get_next_id},
+        vm_inst{OP_LOAD, 2, 0, cmd_link_get_next_id},
+        vm_inst{OP_LOAD, 3, 0, cmd_map_get_next_id},
+        vm_inst{OP_LOAD, 4, 0, cmd_link_detach},
+        vm_inst{OP_READ_CTX, 8, 0, sizeof(int)}, // read command to r8
+        vm_inst{OP_JEQ, 4, 8, 5},                // if r8 == r1 ||
+        vm_inst{OP_JEQ, 1, 8, 4},                // r8 == r1 ||
+        vm_inst{OP_JEQ, 2, 8, 3},                // r8 == r2 ||
+        vm_inst{OP_JEQ, 3, 8, 2},                // r8 == r3
+        vm_inst{OP_JMP, 0, 0, 3},
+        vm_inst{OP_RINGBUF, 0, 0, 0},
+        vm_inst{OP_LOAD, 0, 0, -EPERM}, // return -EPERM to block operation
+        vm_inst{OP_EXIT, 0, 0, 0},
+    };
+}
 
 std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid)
 {
-  const auto proc_super_magic_num = 0x9fa0; // define consts used for the lsm_open program
-  unsigned long long maps = 0;              //
-  unsigned long long smaps = 0;             //
-  unsigned long long mem = 0;               //
-  memcpy(&maps, "maps", 5);                 //
-  memcpy(&smaps, "smaps", 6);               //
-  memcpy(&mem, "mem", 4);
-  
-  return {
-      // vm_inst(op, dst, src, val)
+    const auto proc_super_magic_num = 0x9fa0; // define consts used for the lsm_open program
+    unsigned long long maps = 0;              //
+    unsigned long long smaps = 0;             //
+    unsigned long long mem = 0;               //
+    memcpy(&maps, "maps", 5);                 //
+    memcpy(&smaps, "smaps", 6);               //
+    memcpy(&mem, "mem", 4);
+
+    return {
+        // vm_inst(op, dst, src, val)
         vm_inst{OP_LOAD, 1, 0, protected_pid}, // 01) r1 = protected_pid, 0
-        vm_inst{OP_CALL, 2, 0, 14},            // 02) bpf_get_current_pid_tgid, 1
-        vm_inst{OP_RSHIFT, 2, 2, 32},          // 03) r2 = pid, 2
-        vm_inst{OP_JNEQ, 1, 2, 2},             // 04) ,3
+        vm_inst{OP_CALL, 0, 0, 14},            // 02) bpf_get_current_pid_tgid, 1
+        vm_inst{OP_RSHIFT, 0, 0, 32},          // 03) r0 = pid, 2
+        vm_inst{OP_JNEQ, 1, 0, 2},             // 04) ,3
         vm_inst{OP_EXIT, 0, 0, 0},             // 05) early exit if call from protected pid, 4
 
-        vm_inst{OP_READ_CTX, 3, 32, sizeof(void *)},   // 06) r3 = *inode, 5
+        vm_inst{OP_READ_CTX, 3, 0, sizeof(void *), 32},   // 06) r3 = *inode, 5
         vm_inst{OP_ADD, 3, 0, 40},                     // 07) r3 += 40 (offset), 6
         vm_inst{OP_READ, 4, 3, sizeof(void *)},        // 08) r4 = *inode->i_sb, 7
         vm_inst{OP_ADD, 4, 0, 96},                     // 09) r4 += 96 (offset), 8
@@ -65,7 +95,7 @@ std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid)
         vm_inst{OP_JEQ, 5, 6, 2},                      // 12) ,11
         vm_inst{OP_EXIT, 0, 0, 0},                     // 13) exit if not procfs, 12
 
-        vm_inst{OP_READ_CTX, 3, 32, sizeof(void *)}, // 14) r3 = *inode, 15
+        vm_inst{OP_READ_CTX, 3, 0, sizeof(void *), 32}, // 14) r3 = *inode, 15
         vm_inst{OP_SUB, 3, 0, 72},                   // 15) r3 = *proc_inode, 16
         vm_inst{OP_READ, 4, 3, sizeof(void *)},      // 16) r4 = *struct pid, 17
         vm_inst{OP_ADD, 4, 0, 144},                  // 17) r4 = *upid[0], 18
@@ -75,7 +105,7 @@ std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid)
         vm_inst{OP_LOAD, 0, 0, 0},                   // 21) set return val to 0
         vm_inst{OP_EXIT, 0, 0, 0},                   // 22) exit if not protected pid, 23
 
-        vm_inst{OP_READ_CTX, 3, 64 + 8, sizeof(void *)}, // 23) r3 = *dentry
+        vm_inst{OP_READ_CTX, 3, 0, sizeof(void *), 64 + 8}, // 23) r3 = *dentry
         vm_inst{OP_ADD, 3, 0, 32 + 8},                   // 24) r3 = **name
         vm_inst{OP_READ, 3, 3, sizeof(void *)},          // 25) r3 = *name
         vm_inst{OP_READ, 5, 3, sizeof(void *)},          // 26) r3 = first 8 bytes of name. should probably be on stack and have variable size

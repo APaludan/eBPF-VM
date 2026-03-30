@@ -43,31 +43,21 @@
 #define VM_STACK_SIZE 256
 #define VM_NUM_REGS 16
 
-#define MAX_PROGRAMS 2
+#define MAX_PROGRAMS 3
+
+// program and event types
 #define PTRACE_PROGRAM 0
 #define LSM_OPEN_PROGRAM 1
+#define LSM_BPF_PROGRAM 2
+#define VM_ERROR -1
 
-enum vm_event_type
-{
-    ANY = 0,
-    PTRACE2 = 1,
-    OPEN2 = 2,
-    WRITE2 = 3,
-    READ2 = 4,
-    VM_WRITE2 = 5,
-    VM_READ2 = 6,
-    PROCFS2 = 7,
-    K_TASK_LOOKUP2 = 8,
-    K_VPID_LOOKUP2 = 9,
-    VM_ERROR = 10,
-};
 
 struct vm_event
 {
     char caller_name[16];
     pid_t caller_pid;
     unsigned long long reg_values[VM_NUM_REGS];
-    enum vm_event_type type;
+    int type;
     unsigned int pc;
 };
 
@@ -77,6 +67,7 @@ struct vm_inst
     unsigned short dst;
     unsigned short src;
     long long val;
+    short offset;
 };
 
 struct vm_state
@@ -87,7 +78,7 @@ struct vm_state
     unsigned short sp;
     void *map;
     void *data;
-    enum vm_event_type type;
+    int type;
 };
 
 static inline int next_key(int *current)
@@ -102,5 +93,6 @@ static inline void xor_rolling(struct vm_inst *data, int key)
     data->dst ^= (unsigned short)next_key(&key) >> 1;
     data->val ^= (long long)next_key(&key);
     data->val ^= (long long)next_key(&key) << 32;
-    data->src ^= (unsigned short)next_key(&key) >> 1;
+    data->src ^= (unsigned short)next_key(&key);
+    data->offset ^= (short)next_key(&key);
 }

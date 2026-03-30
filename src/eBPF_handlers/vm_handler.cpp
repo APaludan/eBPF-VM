@@ -32,7 +32,7 @@ int vm_handler::populate_map(int program_type, std::vector<vm_inst> program, bpf
     {
         vm_inst inst = program[i];
 
-        xor_rolling(&inst, key);
+        xor_rolling(&inst, key + i);
 
         uint32_t program_index_i = program_type * VM_MAX_INSTRUCTIONS + i;
         bpf_map__update_elem(map_fd, &program_index_i, sizeof(program_index_i), &inst, sizeof(inst), 0);

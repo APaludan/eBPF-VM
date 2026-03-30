@@ -25,24 +25,16 @@ std::optional<vm_event> vm_agent::get_next_event()
 }
 
 // convert vm_event.type to a string
-std::string_view event_type_to_string(vm_event_type type) 
+std::string_view event_type_to_string(int type) 
 {
     switch (type)
     {
-    case PTRACE2:
+    case PTRACE_PROGRAM:
         return "PTRACE";
-    case OPEN2:
-        return "OPEN";
-    case VM_WRITE2:
-        return "VM_WRITE";
-    case VM_READ2:
-        return "VM_READ";
-    case PROCFS2:
-        return "PROCFS";
-    case K_TASK_LOOKUP2:
-        return "KERNEL_TASK_LOOKUP";
-    case K_VPID_LOOKUP2:
-        return "KERNEL_VPID_LOOKUP";
+    case LSM_BPF_PROGRAM:
+        return "LSM_BPF_PROGRAM";
+    case LSM_OPEN_PROGRAM:
+        return "LSM_OPEN_PROGRAM";
     case VM_ERROR:
         return "VM_ERROR";
     default:
