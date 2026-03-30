@@ -1,19 +1,25 @@
 BUILD_DIR = build
-MAKEFLAGS += --no-print-directory
+CMAKE_FLAGS = -G Ninja -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache
 
-.PHONY: build clean run debug
+.PHONY: build clean run debug test
 
 build:
 	@mkdir -p $(BUILD_DIR)
-	@cd $(BUILD_DIR) && cmake .. && cmake --build .
-	@ln -sf "build/compile_commands.json"
+	@if [ ! -f $(BUILD_DIR)/build.ninja ]; then \
+		cd $(BUILD_DIR) && cmake $(CMAKE_FLAGS) ..; \
+	fi
+	@cmake --build $(BUILD_DIR)
+	@ln -sf "$(BUILD_DIR)/compile_commands.json" .
 
 clean:
 	@rm -rf $(BUILD_DIR)
 	@echo "Build directory cleaned." 
 
 run:
-	@sudo $(BUILD_DIR)/TyrSecure
+	@sudo $(BUILD_DIR)/eBPF_VM
 
 debug:
 	@sudo cat /sys/kernel/tracing/trace_pipe
+
+test:
+	@cd $(BUILD_DIR) && ctest --output-on-failure --debug

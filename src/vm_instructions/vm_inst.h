@@ -2,7 +2,4 @@
 #include "vm_handler.h"
 #include "vm.h"
 
-
-
-std::vector<vm_inst> make_ptrace_program(pid_t protected_pid);
-std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid);
+std::unordered_map<int, std::vector<vm_inst>> generate_programs(pid_t protected_pid);
