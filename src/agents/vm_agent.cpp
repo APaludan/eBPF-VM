@@ -4,7 +4,7 @@
 vm_agent::vm_agent(std::unordered_map<int, std::vector<vm_inst>> program_map)      
     : handler([this](const vm_event &e) { on_event_cb(e); })
 {
-    handler.load_and_attach_all(program_map);
+    err = handler.load_and_attach_all(program_map);
 }
 
 

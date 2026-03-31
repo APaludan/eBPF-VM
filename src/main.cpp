@@ -18,6 +18,10 @@ int main(int argc, char *argv[])
                                      : static_cast<pid_t>(1);
 
     vm_agent agent = vm_agent(generate_programs(protected_pid));
+    if (agent.err == -1)
+    {
+        return 1;
+    }
 
     std::cout << "\n_______________________________________" << std::endl;
     std::cout << "Check the trace pipe in a new terminal:" << std::endl;

@@ -19,4 +19,5 @@ public:
 
     std::optional<vm_event> get_next_event();
     void print_event_data(const vm_event &e);
+    int err;
 };
