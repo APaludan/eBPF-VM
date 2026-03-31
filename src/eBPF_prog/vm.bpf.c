@@ -113,8 +113,8 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     int key = *key_ptr;
     xor_rolling(&inst, key + vm->pc);
 
-    inst.dst &= 0xFF;
-    inst.src &= 0xFF;
+    inst.dst &= VM_NUM_REGS - 1;
+    inst.src &= VM_NUM_REGS - 1;
 
     // just some checks to make verifier happy
     if ((inst.dst >= VM_NUM_REGS) || (inst.src >= VM_NUM_REGS))

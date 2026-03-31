@@ -41,7 +41,7 @@
 #define VM_MAX_INSTRUCTIONS 10000
 #define VM_MAX_LOOPS 100000
 #define VM_STACK_SIZE 256
-#define VM_NUM_REGS 16
+#define VM_NUM_REGS 16 // must be a power of 2!!
 
 #define MAX_PROGRAMS 3
 
