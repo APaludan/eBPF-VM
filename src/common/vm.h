@@ -90,7 +90,7 @@ static inline int next_key(int *current)
 static inline void xor_rolling(struct vm_inst *data, int key)
 {
     data->op ^= (unsigned short)next_key(&key);
-    data->dst ^= (unsigned short)next_key(&key) >> 1;
+    data->dst ^= (unsigned short)next_key(&key);
     data->val ^= (long long)next_key(&key);
     data->val ^= (long long)next_key(&key) << 32;
     data->src ^= (unsigned short)next_key(&key);
