@@ -79,16 +79,16 @@ int vm_handler::load_and_attach_all(std::unordered_map<int, std::vector<vm_inst>
     bpf_map__update_elem(skel_obj->maps.key_map, &index, sizeof(index), &key, sizeof(key), 0);
 
     auto map_fd = skel_obj->maps.programs;
-    for (auto i : program_map) {
+    for (auto i : program_map)
+    {
         populate_map(i.first, i.second, map_fd, key);
     }
-
 
     //====================================================================================================================================
     //======                                                  INSTRUCTION SET ENDS                                                 =======
     //====================================================================================================================================
 
-    if (int err = skel_obj->attach(skel_obj.get()))
+    if (int err = vm::attach(skel_obj.get()))
     {
         std::cerr << "Failed to attach: " << err << std::endl;
         rb.reset();
