@@ -14,7 +14,7 @@ T random_value() {
     return key_dist(gen);
 }
 
-TEST(EncodingTests, XorInstruction1)
+TEST(EncryptionTests, XorInstruction1)
 {
     auto key = random_value<int>();
 
@@ -22,12 +22,14 @@ TEST(EncodingTests, XorInstruction1)
     unsigned short original_dst = 2;
     unsigned short original_src = 0;
     long long original_val = 14;
+    short original_offset = 4;
 
     vm_inst i = {
         .op = original_op,
         .dst = original_dst,
         .src = original_src,
-        .val = original_val};
+        .val = original_val,
+        .offset = original_offset};
 
     xor_rolling(&i, key);
 
@@ -35,6 +37,7 @@ TEST(EncodingTests, XorInstruction1)
     EXPECT_NE(i.dst, original_dst);
     EXPECT_NE(i.src, original_src);
     EXPECT_NE(i.val, original_val);
+    EXPECT_NE(i.offset, original_offset);
 
     xor_rolling(&i, key);
 
@@ -42,9 +45,10 @@ TEST(EncodingTests, XorInstruction1)
     EXPECT_EQ(i.dst, original_dst);
     EXPECT_EQ(i.src, original_src);
     EXPECT_EQ(i.val, original_val);
+    EXPECT_EQ(i.offset, original_offset);
 }
 
-TEST(EncodingTests, XorInstruction2)
+TEST(EncryptionTests, XorInstruction2)
 {
     auto key = random_value<int>();
 
@@ -52,12 +56,14 @@ TEST(EncodingTests, XorInstruction2)
     unsigned short original_dst = 1;
     unsigned short original_src = 2;
     long long original_val = 123;
+    short original_offset = -5;
 
     vm_inst i = {
         .op = original_op,
         .dst = original_dst,
         .src = original_src,
-        .val = original_val};
+        .val = original_val,
+        .offset = original_offset};
 
     xor_rolling(&i, key);
 
@@ -65,6 +71,7 @@ TEST(EncodingTests, XorInstruction2)
     EXPECT_NE(i.dst, original_dst);
     EXPECT_NE(i.src, original_src);
     EXPECT_NE(i.val, original_val);
+    EXPECT_NE(i.offset, original_offset);
 
     xor_rolling(&i, key);
 
@@ -72,22 +79,25 @@ TEST(EncodingTests, XorInstruction2)
     EXPECT_EQ(i.dst, original_dst);
     EXPECT_EQ(i.src, original_src);
     EXPECT_EQ(i.val, original_val);
+    EXPECT_EQ(i.offset, original_offset);
 }
 
-TEST(EncodingTests, XorInstruction3)
+TEST(EncryptionTests, XorInstruction3)
 {
     auto key = random_value<int>();
 
     unsigned short original_op = OP_LOAD;
-    unsigned short original_dst = 1;
-    unsigned short original_src = 0;
-    long long original_val = 1;
+    unsigned short original_dst = 65432;
+    unsigned short original_src = 12345;
+    long long original_val = -312431511;
+    short original_offset = 32000;
 
     vm_inst i = {
         .op = original_op,
         .dst = original_dst,
         .src = original_src,
-        .val = original_val};
+        .val = original_val,
+        .offset = original_offset};
 
     xor_rolling(&i, key);
 
@@ -95,6 +105,7 @@ TEST(EncodingTests, XorInstruction3)
     EXPECT_NE(i.dst, original_dst);
     EXPECT_NE(i.src, original_src);
     EXPECT_NE(i.val, original_val);
+    EXPECT_NE(i.offset, original_offset);
 
     xor_rolling(&i, key);
 
@@ -102,4 +113,5 @@ TEST(EncodingTests, XorInstruction3)
     EXPECT_EQ(i.dst, original_dst);
     EXPECT_EQ(i.src, original_src);
     EXPECT_EQ(i.val, original_val);
+    EXPECT_EQ(i.offset, original_offset);
 }

@@ -42,6 +42,19 @@ struct
 //====            HOOK POINTS           ====
 //==========================================
 
+SEC("lsm/bpf")
+int BPF_PROG(restrict_bpf, int cmd, union bpf_attr *attr, unsigned int size)
+{
+    struct vm_state vm = {0};
+    vm.type = LSM_BPF_PROGRAM;
+    vm.data = (void *)&cmd;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+
+    int ret = (int)vm.regs[0];
+    return (ret == 0) ? 0 : -EPERM;
+}
+
 SEC("tp/syscalls/sys_enter_ptrace")
 int ebpf_vm_interpreter(struct trace_event_raw_sys_enter *ctx)
 {
@@ -92,23 +105,27 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     // Copy to stack
     struct vm_inst inst = *inst_ptr;
 
-    // get key and decode instruction
+    // get key and decrypt instruction
     unsigned int index = 0;
     int *key_ptr = bpf_map_lookup_elem(&key_map, &index);
-    if (key_ptr == NULL)
+    if (!key_ptr)
         return vm_error(vm);
     int key = *key_ptr;
-    xor_rolling(&inst, key);
+    xor_rolling(&inst, key + vm->pc);
+
+    inst.dst &= VM_NUM_REGS - 1;
+    inst.src &= VM_NUM_REGS - 1;
 
     // just some checks to make verifier happy
-    if (inst.dst >= VM_NUM_REGS ||
-        (inst.src >= VM_NUM_REGS && inst.op != OP_READ_CTX))
+    if ((inst.dst >= VM_NUM_REGS) || (inst.src >= VM_NUM_REGS))
+    {
         return vm_error(vm);
+    }
 
     switch (inst.op)
     {
     case OP_LOAD:
-        vm->regs[inst.dst] = (long long)inst.val;
+        vm->regs[inst.dst] = inst.val;
         break;
 
     case OP_ADD:
@@ -194,13 +211,12 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
 
     case OP_READ:
     {
-        long long val = inst.val;
-        if (val <= 0 || val > 8 || inst.dst >= VM_NUM_REGS)
+        if (inst.val <= 0 || inst.val > (long long)sizeof(vm->regs[0]))
         {
             return vm_error(vm);
         }
 
-        unsigned int size = (unsigned int)val;
+        unsigned int size = (unsigned int)inst.val;
 
         vm->regs[0] = bpf_probe_read_kernel(&vm->regs[inst.dst],
                                             size,
@@ -210,19 +226,16 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
 
     case OP_READ_CTX:
     {
-        long long val = inst.val;
-        if (val <= 0 || val > 8 || inst.dst >= VM_NUM_REGS)
+        if (inst.val <= 0 || inst.val > (long long)sizeof(vm->regs[0]))
         {
             return vm_error(vm);
         }
 
-        unsigned int size = (unsigned int)val;
+        unsigned int size = (unsigned int)inst.val;
 
-        int err = bpf_probe_read_kernel(&vm->regs[inst.dst],
-                                        size,
-                                        vm->data + (size_t)inst.src);
-        if (err)
-            return vm_error(vm);
+        vm->regs[0] = bpf_probe_read_kernel(&vm->regs[inst.dst],
+                                            size,
+                                            vm->data + inst.offset);
 
         break;
     }
