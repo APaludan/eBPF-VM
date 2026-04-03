@@ -11,6 +11,7 @@
 
 static long vm_callback_fn(unsigned int nr_loops, void *ctx);
 static int vm_error(struct vm_state *vm);
+static bool decrypt_inst(struct vm_inst *inst, int program_counter);
 bool deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm);
 
 //==========================================
@@ -93,13 +94,8 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     struct vm_inst inst = {0};
 
     deserialize_next_inst(&inst, vm);
+    decrypt_inst(&inst, vm->pc);
 
-    // get key and decrypt instruction
-    unsigned int key_idx = 0;
-    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
-    if (!key_ptr)
-        return vm_error(vm);
-    xor_rolling(&inst, *key_ptr + vm->pc);
 
     inst.dst &= VM_NUM_REGS - 1;
     inst.src &= VM_NUM_REGS - 1;
@@ -280,6 +276,17 @@ static int vm_error(struct vm_state *vm)
         bpf_ringbuf_submit(e, 0);
     }
     return 1;
+}
+
+static bool decrypt_inst(struct vm_inst *inst, int program_counter)
+{
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (!key_ptr)
+        return false;
+    xor_rolling(inst, *key_ptr + program_counter);
+
+    return true;
 }
 
 // get next 8 bytes. increments `idx` by 2
