@@ -78,6 +78,8 @@ int BPF_PROG(restrict_proc_access, struct file *file)
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
+    return 0; // keep for testing
+
     return (vm.regs[0] == 0) ? 0 : -EPERM;
 }
 
@@ -93,8 +95,8 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     deserialize_next_inst(&inst, vm);
 
     // get key and decrypt instruction
-    unsigned int index = 0;
-    int *key_ptr = bpf_map_lookup_elem(&key_map, &index);
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
     if (!key_ptr)
         return vm_error(vm);
     xor_rolling(&inst, *key_ptr + vm->pc);
@@ -131,11 +133,11 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
         break;
 
     case OP_PRINT:
-        bpf_printk("VM Reg[%d] = %llu", inst.src, vm->regs[inst.src]);
+        bpf_printk("VM Reg[%u] = %llu", inst.src, vm->regs[inst.src]);
         break;
 
     case OP_PRINTI:
-        bpf_printk("VM Reg[%d] = %lli", inst.src, vm->regs[inst.src]);
+        bpf_printk("VM Reg[%u] = %lli", inst.src, vm->regs[inst.src]);
         break;
 
     case OP_PRINTS:
@@ -280,24 +282,39 @@ static int vm_error(struct vm_state *vm)
     return 1;
 }
 
-static unsigned short get_two(struct vm_inst *inst, struct vm_state *vm, unsigned int *idx)
+// get next 8 bytes. increments `idx` by 2
+static bool get_uint16(unsigned int *idx, uint16_t *dst)
 {
-    unsigned short res = 0;
-    uint8_t *b = bpf_map_lookup_elem(&programs, idx);
-    if (!b)
-        return -1; // return garbage
-    res = (unsigned short)*b;
-    *idx++;
-    b = bpf_map_lookup_elem(&programs, idx);
-    if (!b)
-        return -1;
-    inst->op |= ((unsigned short)*b << 8);
-    *idx++;
-
-    return res;
+    uint8_t *b;
+#pragma unroll
+    for (size_t i = 0; i < sizeof(uint16_t); i++)
+    {
+        b = bpf_map_lookup_elem(&programs, idx);
+        if (!b)
+            return false;
+        *dst |= ((uint16_t)*b << (8 * i));
+        *idx = *idx + 1;
+    }
+    return true;
 }
 
-/// @brief fetch the next instruction from `programs` map and save data in `inst`.
+// get next 8 bytes. increments `idx` by 8
+static bool get_uint64(unsigned int *idx, uint64_t *dst)
+{
+    uint8_t *b;
+#pragma unroll
+    for (size_t i = 0; i < sizeof(uint64_t); i++)
+    {
+        b = bpf_map_lookup_elem(&programs, idx);
+        if (!b)
+            return false;
+        *dst |= ((uint64_t)*b << (8 * i));
+        *idx = *idx + 1;
+    }
+    return true;
+}
+
+/// @brief get the next instruction from `programs` map and save data in `inst`.
 /// @param inst
 /// @param vm
 /// @return true if success, false otherwise
@@ -311,66 +328,11 @@ bool deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm)
     // TODO: make more memory effecient a lot of unused slots atm
     unsigned int program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc * sizeof(struct vm_inst);
 
-    uint8_t *b;
-
-    // get 2 bytes for inst.op
-    b = bpf_map_lookup_elem(&programs, &program_index_pc);
-    if (!b)
-        return false;
-    inst->op = (unsigned short)*b;
-    program_index_pc++;
-    b = bpf_map_lookup_elem(&programs, &program_index_pc);
-    if (!b)
-        return false;
-    inst->op |= ((unsigned short)*b << 8);
-    program_index_pc++;
-
-    // get 2 bytes for inst.dst
-    b = bpf_map_lookup_elem(&programs, &program_index_pc);
-    if (!b)
-        return false;
-    inst->dst = (unsigned short)*b;
-    program_index_pc++;
-    b = bpf_map_lookup_elem(&programs, &program_index_pc);
-    if (!b)
-        return false;
-    inst->dst |= ((unsigned short)*b << 8);
-    program_index_pc++;
-
-    // get 2 bytes for inst.src
-    b = bpf_map_lookup_elem(&programs, &program_index_pc);
-    if (!b)
-        return false;
-    inst->src = (unsigned short)*b;
-    program_index_pc++;
-    b = bpf_map_lookup_elem(&programs, &program_index_pc);
-    if (!b)
-        return false;
-    inst->src |= ((unsigned short)*b << 8);
-    program_index_pc++;
-
-    // ger 8 bytes for inst.val
-    inst->val = 0;
-#pragma unroll
-    for (int i = 0; i < 8; i++)
-    {
-        b = bpf_map_lookup_elem(&programs, &program_index_pc);
-        if (!b)
-            return false;
-        inst->val |= ((long long)*b << (8 * i));
-        program_index_pc++;
-    }
-
-    // get 2 bytes for inst.offset
-    b = bpf_map_lookup_elem(&programs, &program_index_pc);
-    if (!b)
-        return false;
-    inst->offset = (short)*b;
-    program_index_pc++;
-    b = bpf_map_lookup_elem(&programs, &program_index_pc);
-    if (!b)
-        return false;
-    inst->offset |= ((short)*b << 8);
+    get_uint16(&program_index_pc, (uint16_t *)&inst->op);
+    get_uint16(&program_index_pc, (uint16_t *)&inst->dst);
+    get_uint16(&program_index_pc, (uint16_t *)&inst->src);
+    get_uint64(&program_index_pc, (uint64_t *)&inst->val);
+    get_uint16(&program_index_pc, (uint16_t *)&inst->offset);
 
     return true;
 }
