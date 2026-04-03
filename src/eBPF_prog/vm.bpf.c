@@ -11,6 +11,7 @@
 
 static long vm_callback_fn(unsigned int nr_loops, void *ctx);
 static int vm_error(struct vm_state *vm);
+bool deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm);
 
 //==========================================
 //====          MAP STRUCTURES          ====
@@ -33,9 +34,9 @@ struct
 struct
 {
     __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(max_entries, VM_MAX_INSTRUCTIONS *MAX_PROGRAMS);
+    __uint(max_entries, VM_MAX_INSTRUCTIONS * MAX_PROGRAMS * sizeof(struct vm_inst));
     __type(key, unsigned int);
-    __type(value, struct vm_inst);
+    __type(value, uint8_t);
 } programs SEC(".maps");
 
 //==========================================
@@ -51,8 +52,7 @@ int BPF_PROG(restrict_bpf, int cmd, union bpf_attr *attr, unsigned int size)
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
-    int ret = (int)vm.regs[0];
-    return (ret == 0) ? 0 : -EPERM;
+    return (vm.regs[0] == 0) ? 0 : -EPERM;
 }
 
 SEC("tp/syscalls/sys_enter_ptrace")
@@ -78,10 +78,7 @@ int BPF_PROG(restrict_proc_access, struct file *file)
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
-    return 0; // remove when vm prog works correctly
-
-    int ret = (int)vm.regs[0];
-    return (ret == 0) ? 0 : -EPERM;
+    return (vm.regs[0] == 0) ? 0 : -EPERM;
 }
 
 //==========================================
@@ -91,27 +88,16 @@ int BPF_PROG(restrict_proc_access, struct file *file)
 static long vm_callback_fn(unsigned int nr_loops, void *ctx)
 {
     struct vm_state *vm = (struct vm_state *)ctx;
+    struct vm_inst inst = {0};
 
-    // Fetch encrypted instruction (uses defined vm type in hook point logic to get the right instruction in programs map)
-    // PTRACE_PROGRAM = 0 (defined in vm.h) has the first VM_MAX_INSTRUCTIONS entries of the map
-    // LSM_OPEN_PROGRAM = 1 (defined in vm.h) has the entries after the first VM_MAX_INSTRUCTIONS entries of the map
-    // TODO: make more memory effecient a lot of unused slots atm
-    unsigned int program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc;
-    struct vm_inst *inst_ptr = bpf_map_lookup_elem(&programs, &program_index_pc);
-
-    if (!inst_ptr)
-        return vm_error(vm);
-
-    // Copy to stack
-    struct vm_inst inst = *inst_ptr;
+    deserialize_next_inst(&inst, vm);
 
     // get key and decrypt instruction
     unsigned int index = 0;
     int *key_ptr = bpf_map_lookup_elem(&key_map, &index);
     if (!key_ptr)
         return vm_error(vm);
-    int key = *key_ptr;
-    xor_rolling(&inst, key + vm->pc);
+    xor_rolling(&inst, *key_ptr + vm->pc);
 
     inst.dst &= VM_NUM_REGS - 1;
     inst.src &= VM_NUM_REGS - 1;
@@ -216,10 +202,8 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
             return vm_error(vm);
         }
 
-        unsigned int size = (unsigned int)inst.val;
-
         vm->regs[0] = bpf_probe_read_kernel(&vm->regs[inst.dst],
-                                            size,
+                                            inst.val,
                                             (void *)vm->regs[inst.src]);
         break;
     }
@@ -231,10 +215,8 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
             return vm_error(vm);
         }
 
-        unsigned int size = (unsigned int)inst.val;
-
         vm->regs[0] = bpf_probe_read_kernel(&vm->regs[inst.dst],
-                                            size,
+                                            inst.val,
                                             vm->data + inst.offset);
 
         break;
@@ -269,7 +251,8 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
         break;
 
     default:
-        bpf_printk("Unknown op %i at pc=", inst.op, vm->pc);
+        bpf_printk("op: %u, dst: %u, src: %u, val %lli, offset: %i", inst.op, inst.dst, inst.src, inst.val, inst.offset);
+        bpf_printk("Unknown op %i at pc=%u in prog %i", inst.op, vm->pc, vm->type);
         return vm_error(vm);
     }
 
@@ -295,6 +278,101 @@ static int vm_error(struct vm_state *vm)
         bpf_ringbuf_submit(e, 0);
     }
     return 1;
+}
+
+static unsigned short get_two(struct vm_inst *inst, struct vm_state *vm, unsigned int *idx)
+{
+    unsigned short res = 0;
+    uint8_t *b = bpf_map_lookup_elem(&programs, idx);
+    if (!b)
+        return -1; // return garbage
+    res = (unsigned short)*b;
+    *idx++;
+    b = bpf_map_lookup_elem(&programs, idx);
+    if (!b)
+        return -1;
+    inst->op |= ((unsigned short)*b << 8);
+    *idx++;
+
+    return res;
+}
+
+/// @brief fetch the next instruction from `programs` map and save data in `inst`.
+/// @param inst
+/// @param vm
+/// @return true if success, false otherwise
+bool deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm)
+{
+    if (!inst || !vm)
+        return false;
+    // Fetch encrypted instruction (uses defined vm type in hook point logic to get the right instruction in programs map)
+    // PTRACE_PROGRAM = 0 (defined in vm.h) has the first VM_MAX_INSTRUCTIONS entries of the map
+    // LSM_OPEN_PROGRAM = 1 (defined in vm.h) has the entries after the first VM_MAX_INSTRUCTIONS entries of the map
+    // TODO: make more memory effecient a lot of unused slots atm
+    unsigned int program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc * sizeof(struct vm_inst);
+
+    uint8_t *b;
+
+    // get 2 bytes for inst.op
+    b = bpf_map_lookup_elem(&programs, &program_index_pc);
+    if (!b)
+        return false;
+    inst->op = (unsigned short)*b;
+    program_index_pc++;
+    b = bpf_map_lookup_elem(&programs, &program_index_pc);
+    if (!b)
+        return false;
+    inst->op |= ((unsigned short)*b << 8);
+    program_index_pc++;
+
+    // get 2 bytes for inst.dst
+    b = bpf_map_lookup_elem(&programs, &program_index_pc);
+    if (!b)
+        return false;
+    inst->dst = (unsigned short)*b;
+    program_index_pc++;
+    b = bpf_map_lookup_elem(&programs, &program_index_pc);
+    if (!b)
+        return false;
+    inst->dst |= ((unsigned short)*b << 8);
+    program_index_pc++;
+
+    // get 2 bytes for inst.src
+    b = bpf_map_lookup_elem(&programs, &program_index_pc);
+    if (!b)
+        return false;
+    inst->src = (unsigned short)*b;
+    program_index_pc++;
+    b = bpf_map_lookup_elem(&programs, &program_index_pc);
+    if (!b)
+        return false;
+    inst->src |= ((unsigned short)*b << 8);
+    program_index_pc++;
+
+    // ger 8 bytes for inst.val
+    inst->val = 0;
+#pragma unroll
+    for (int i = 0; i < 8; i++)
+    {
+        b = bpf_map_lookup_elem(&programs, &program_index_pc);
+        if (!b)
+            return false;
+        inst->val |= ((long long)*b << (8 * i));
+        program_index_pc++;
+    }
+
+    // get 2 bytes for inst.offset
+    b = bpf_map_lookup_elem(&programs, &program_index_pc);
+    if (!b)
+        return false;
+    inst->offset = (short)*b;
+    program_index_pc++;
+    b = bpf_map_lookup_elem(&programs, &program_index_pc);
+    if (!b)
+        return false;
+    inst->offset |= ((short)*b << 8);
+
+    return true;
 }
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";

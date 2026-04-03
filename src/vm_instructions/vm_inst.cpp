@@ -1,4 +1,5 @@
 #include "vm_inst.h"
+#include <cstring>
 
 std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid);
 std::vector<vm_inst> make_ptrace_program(pid_t protected_pid);
@@ -44,7 +45,7 @@ std::vector<vm_inst> make_lsm_bpf_program()
     const int cmd_link_detach = 34;
 
     return {
-        //vm_inst{OP_EXIT, 0, 0, 0, 0},
+        vm_inst{OP_EXIT, 0, 0, 0, 0},
         vm_inst{OP_LOAD, 1, 0, pid, 0},
         vm_inst{OP_CALL, 0, 0, 14, 0},   // bpf_get_current_pid_tgid
         vm_inst{OP_RSHIFT, 0, 0, 32, 0}, // r0 = pid
@@ -79,7 +80,7 @@ std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid)
     memcpy(&mem, "mem", 4);
 
     return {
-        // vm_inst(op, dst, src, val)
+        // vm_inst(op, dst, src, val, offset)
         vm_inst{OP_LOAD, 1, 0, protected_pid, 0}, // 01) r1 = protected_pid, 0
         vm_inst{OP_CALL, 0, 0, 14, 0},            // 02) bpf_get_current_pid_tgid, 1
         vm_inst{OP_RSHIFT, 0, 0, 32, 0},          // 03) r0 = pid, 2
@@ -123,3 +124,23 @@ std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid)
         vm_inst{OP_EXIT, 0, 0, 0, 0}, // 36) exit if not protected filename
     };
 };
+
+
+std::vector<uint8_t> serialize_inst(const vm_inst& inst) {
+    std::vector<uint8_t> buffer(sizeof(vm_inst));
+    size_t pos = 0;
+
+    // Helper to copy bytes and advance position
+    auto append = [&](const void* src, size_t size) {
+        std::memcpy(buffer.data() + pos, src, size);
+        pos += size;
+    };
+
+    append(&inst.op,     sizeof(inst.op));     // 2 bytes
+    append(&inst.dst,    sizeof(inst.dst));    // 2 bytes
+    append(&inst.src,    sizeof(inst.src));    // 2 bytes
+    append(&inst.val,    sizeof(inst.val));    // 8 bytes
+    append(&inst.offset, sizeof(inst.offset)); // 2 bytes
+
+    return buffer;
+}

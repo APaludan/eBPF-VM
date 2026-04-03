@@ -7,6 +7,6 @@ target_include_directories(
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
   PUBLIC ${CMAKE_BINARY_DIR}/skeletons)
 
-target_link_libraries(eBPF_Handlers DataTypes)
+target_link_libraries(eBPF_Handlers DataTypes VM_inst)
 
 add_dependencies(eBPF_Handlers vm_skel)

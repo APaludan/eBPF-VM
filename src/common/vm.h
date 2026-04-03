@@ -41,7 +41,7 @@
 #define VM_MAX_INSTRUCTIONS 10000
 #define VM_MAX_LOOPS 100000
 #define VM_STACK_SIZE 256
-#define VM_NUM_REGS 16 // must be a power of 2!!
+#define VM_NUM_REGS 10 // must be a power of 2!! (or maybe not🤔🤔)
 
 #define MAX_PROGRAMS 3
 
@@ -96,3 +96,38 @@ static inline void xor_rolling(struct vm_inst *data, int key)
     data->src ^= (unsigned short)next_key(&key);
     data->offset ^= (short)next_key(&key);
 }
+
+// static bool have_src(int op)
+// {
+//     switch (op)
+//     {
+//     case 1:
+//     case 10 ... 15:
+//     case 31 ... 34:
+//     case 42 ... 43:
+//     case 45:
+//     case 47:
+//     case 60 ... 62:
+//         return true;
+
+//     default:
+//         return false;
+//     }
+// }
+
+// static bool have_dst(int op)
+// {
+//     switch (op)
+//     {
+//     case 1:
+//     case 10 ... 15:
+//     case 31 ... 34:
+//     case 40 ... 41:
+//     case 43 ... 44:
+//     case 46 ... 47:
+//         return true;
+
+//     default:
+//         return false;
+//     }
+// }

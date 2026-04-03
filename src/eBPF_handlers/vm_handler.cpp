@@ -1,5 +1,6 @@
 #include "vm_handler.h"
 #include "vm.h"
+#include "vm_inst.h"
 #include "string.h"
 #include <bpf/libbpf.h>
 #include <cerrno>
@@ -7,6 +8,7 @@
 #include <iostream>
 #include <thread>
 #include <random>
+#include <vector>
 
 // Ringbuffer callback function, used to call the lampda function when an event arrives
 int vm_handler::ring_buffer_callback(void *ctx, void *data, size_t data_size)
@@ -34,8 +36,13 @@ int vm_handler::populate_map(int program_type, std::vector<vm_inst> program, bpf
 
         xor_rolling(&inst, key + i);
 
-        uint32_t program_index_i = program_type * VM_MAX_INSTRUCTIONS + i;
-        bpf_map__update_elem(map_fd, &program_index_i, sizeof(program_index_i), &inst, sizeof(inst), 0);
+        auto bytes = serialize_inst(inst);
+        for (size_t j = 0; j < bytes.size(); j++)
+        {
+            auto b = bytes[j];
+            unsigned int idx = program_type * VM_MAX_INSTRUCTIONS + i*sizeof(vm_inst) + j;
+            bpf_map__update_elem(map_fd, &idx, sizeof(idx), &b, sizeof(uint8_t), 0);
+        }
     }
 
     return 0;
