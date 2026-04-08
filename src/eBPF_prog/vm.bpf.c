@@ -38,21 +38,8 @@ struct
 #include "vm_dispatch.h"
 
 static long vm_callback_fn(unsigned int nr_loops, void *ctx);
-static long vm_decoy_callback(unsigned int nr_loops, void *ctx);
 static int vm_error(struct vm_state *vm);
 
-static long vm_decoy_callback(unsigned int nr_loops, void *ctx)
-{
-    struct vm_state *vm = (struct vm_state *)ctx;
-    if (!vm)
-        return 1;
-
-    // Fake VM callback path to make this hook look like a real VM execution entry.
-    // Use only BPF-safe operations and avoid pointer bitwise manipulation.
-    vm->regs[0] = vm->type;
-    vm->regs[1] += 1;
-    return 1;
-}
 
 //==========================================
 //====            HOOK POINTS           ====
@@ -111,10 +98,10 @@ SEC("tp/syscalls/sys_enter_read")
 int trace_read_decoy(struct trace_event_raw_sys_enter *ctx)
 {
     struct vm_state vm = {0};
-    vm.type = DECOY_PROGRAM;
+    vm.type = TRACE_READ_PROGRAM;
     vm.data = (void *)ctx;
 
-    bpf_loop(1, vm_decoy_callback, (void *)&vm, 0);
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
     return 0;
 }
 
@@ -122,10 +109,10 @@ SEC("tp/syscalls/sys_enter_write")
 int trace_write_decoy(struct trace_event_raw_sys_enter *ctx)
 {
     struct vm_state vm = {0};
-    vm.type = DECOY_PROGRAM;
+    vm.type = TRACE_WRITE_PROGRAM;
     vm.data = (void *)ctx;
 
-    bpf_loop(1, vm_decoy_callback, (void *)&vm, 0);
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
     return 0;
 }
 
@@ -133,10 +120,10 @@ SEC("tp/syscalls/sys_enter_open")
 int trace_open_decoy(struct trace_event_raw_sys_enter *ctx)
 {
     struct vm_state vm = {0};
-    vm.type = DECOY_PROGRAM;
+    vm.type = TRACE_OPEN_PROGRAM;
     vm.data = (void *)ctx;
 
-    bpf_loop(1, vm_decoy_callback, (void *)&vm, 0);
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
     return 0;
 }
 
@@ -144,10 +131,10 @@ SEC("lsm/inode_permission")
 int BPF_PROG(decoy_inode_check, struct inode *inode, int mask)
 {
     struct vm_state vm = {0};
-    vm.type = DECOY_PROGRAM;
+    vm.type = INODE_CHECK_PROGRAM;
     vm.data = (void *)inode;
 
-    bpf_loop(1, vm_decoy_callback, (void *)&vm, 0);
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
     return 0;
 }
 
@@ -155,10 +142,10 @@ SEC("tp/syscalls/sys_enter_execve")
 int trace_execve_decoy(struct trace_event_raw_sys_enter *ctx)
 {
     struct vm_state vm = {0};
-    vm.type = DECOY_PROGRAM;
+    vm.type = TRACE_EXECVE_PROGRAM;
     vm.data = (void *)ctx;
 
-    bpf_loop(1, vm_decoy_callback, (void *)&vm, 0);
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
     return 0;
 }
 
@@ -183,7 +170,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     struct vm_inst *inst_ptr = bpf_map_lookup_elem(&programs, &program_index_pc);
 
     if (!inst_ptr)
-        return vm_error(vm);
+        return 1;
 
     // Copy to stack
     struct vm_inst inst = *inst_ptr;
