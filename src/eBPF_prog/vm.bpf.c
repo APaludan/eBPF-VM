@@ -40,9 +40,18 @@ struct
     __type(value, uint8_t);
 } programs SEC(".maps");
 
+#include "vm_dispatch.h"
+
+static long vm_callback_fn(unsigned int nr_loops, void *ctx);
+static int vm_error(struct vm_state *vm);
+
+
 //==========================================
 //====            HOOK POINTS           ====
 //==========================================
+
+//------------- ACTIVE HOOKS (Core VM Execution) -------
+// These hooks intercept actual security-relevant events
 
 SEC("lsm/bpf")
 int BPF_PROG(restrict_bpf, int cmd, union bpf_attr *attr, unsigned int size)
@@ -84,10 +93,73 @@ int BPF_PROG(restrict_proc_access, struct file *file)
     return (vm.regs[0] == 0) ? 0 : -EPERM;
 }
 
+//------------- DECOY HOOKS (Obfuscation) -------
+// These hooks perform dummy operations to confuse potential attackers
+// Decoys create false patterns and misdirection
+
+SEC("tp/syscalls/sys_enter_read")
+int trace_read_decoy(struct trace_event_raw_sys_enter *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_READ_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/syscalls/sys_enter_write")
+int trace_write_decoy(struct trace_event_raw_sys_enter *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_WRITE_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/syscalls/sys_enter_open")
+int trace_open_decoy(struct trace_event_raw_sys_enter *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_OPEN_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("lsm/inode_permission")
+int BPF_PROG(decoy_inode_check, struct inode *inode, int mask)
+{
+    struct vm_state vm = {0};
+    vm.type = INODE_CHECK_PROGRAM;
+    vm.data = (void *)inode;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/syscalls/sys_enter_execve")
+int trace_execve_decoy(struct trace_event_raw_sys_enter *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_EXECVE_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+//------------- END HOOK POINTS -------
+
 //==========================================
 //====             VM LOGIC             ====
 //==========================================
 
+// Core VM execution callback - runs per instruction
+// Called by bpf_loop() to iterate through program bytecode
 static long vm_callback_fn(unsigned int nr_loops, void *ctx)
 {
     struct vm_state *vm = (struct vm_state *)ctx;
@@ -97,6 +169,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     decrypt_inst(&inst, vm->pc);
 
 
+    //========== INSTRUCTION VALIDATION ==========
     inst.dst &= VM_NUM_REGS - 1;
     inst.src &= VM_NUM_REGS - 1;
 
@@ -106,158 +179,28 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
         return vm_error(vm);
     }
 
-    switch (inst.op)
+    //========== INSTRUCTION EXECUTION DISPATCH ==========
+    // Dispatch instruction to appropriate handler based on category
+    long dispatch_result = vm_execute_instruction(&inst, vm);
+    
+    if (dispatch_result == 1)
     {
-    case OP_LOAD:
-        vm->regs[inst.dst] = inst.val;
-        break;
-
-    case OP_ADD:
-        vm->regs[inst.dst] += inst.val == 0 ? vm->regs[inst.src] : inst.val;
-        break;
-
-    case OP_SUB:
-        vm->regs[inst.dst] -= inst.val == 0 ? vm->regs[inst.src] : inst.val;
-        break;
-
-    case OP_MULT:
-        vm->regs[inst.dst] *= inst.val == 0 ? vm->regs[inst.src] : inst.val;
-        break;
-
-    case OP_DIV:
-        vm->regs[inst.dst] /= inst.val == 0 ? vm->regs[inst.src] : inst.val;
-        break;
-
-    case OP_PRINT:
-        bpf_printk("VM Reg[%u] = %llu", inst.src, vm->regs[inst.src]);
-        break;
-
-    case OP_PRINTI:
-        bpf_printk("VM Reg[%u] = %lli", inst.src, vm->regs[inst.src]);
-        break;
-
-    case OP_PRINTS:
-        bpf_printk("VM String = %s", (char *)vm->regs[inst.src]);
-        break;
-
-    case OP_EXIT:
-        return 1;
-
-    case OP_CALL:
-        switch (inst.val)
-        {
-        case 14:
-            vm->regs[0] = ((long (*)(void))(long)inst.val)();
-            break;
-
-        case 16:
-            if (vm->sp + TASK_COMM_LEN > VM_STACK_SIZE)
-                return vm_error(vm);
-
-            vm->regs[0] =
-                ((long (*const)(void *, unsigned int))(long)inst.val)(
-                    (void *)&vm->stack[vm->sp], TASK_COMM_LEN);
-            break;
-
-        default:
-            bpf_printk("call failed, id: %llu", inst.val);
-            return vm_error(vm);
-        }
-        break;
-
-    case OP_LSHIFT:
-        vm->regs[inst.dst] = vm->regs[inst.src] << inst.val;
-        break;
-
-    case OP_RSHIFT:
-        vm->regs[inst.dst] = vm->regs[inst.src] >> inst.val;
-        break;
-
-    case OP_JMP:
-        vm->pc += inst.val;
+        // Error occurred or exit requested
+        return dispatch_result;
+    }
+    else if (dispatch_result != 0)
+    {
+        // Control flow instruction handled the PC update
         return 0;
-
-    case OP_JEQ:
-        if (vm->regs[inst.dst] == vm->regs[inst.src])
-        {
-            vm->pc += inst.val;
-            return 0;
-        }
-        break;
-
-    case OP_JNEQ:
-        if (vm->regs[inst.dst] != vm->regs[inst.src])
-        {
-            vm->pc += inst.val;
-            return 0;
-        }
-        break;
-
-    case OP_READ:
-    {
-        if (inst.val <= 0 || inst.val > (long long)sizeof(vm->regs[0]))
-        {
-            return vm_error(vm);
-        }
-
-        vm->regs[0] = bpf_probe_read_kernel(&vm->regs[inst.dst],
-                                            inst.val,
-                                            (void *)vm->regs[inst.src]);
-        break;
     }
 
-    case OP_READ_CTX:
-    {
-        if (inst.val <= 0 || inst.val > (long long)sizeof(vm->regs[0]))
-        {
-            return vm_error(vm);
-        }
-
-        vm->regs[0] = bpf_probe_read_kernel(&vm->regs[inst.dst],
-                                            inst.val,
-                                            vm->data + inst.offset);
-
-        break;
-    }
-
-    case OP_RINGBUF:
-    {
-        struct vm_event *e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
-        if (e)
-        {
-            e->caller_pid = bpf_get_current_pid_tgid() >> 32;
-            e->type = vm->type;
-            bpf_get_current_comm(e->caller_name, sizeof(e->caller_name));
-
-            for (int i = 0; i < VM_NUM_REGS; i++)
-            {
-                e->reg_values[i] = vm->regs[i];
-            }
-
-            e->pc = vm->pc;
-            bpf_ringbuf_submit(e, 0);
-        }
-        break;
-    }
-
-    case OP_LOAD_SP:
-        vm->regs[inst.dst] = (unsigned long long)&vm->stack[vm->sp];
-        break;
-
-    case OP_SET_SP:
-        vm->sp += inst.val;
-        break;
-
-    default:
-        bpf_printk("op: %u, dst: %u, src: %u, val %lli, offset: %i", inst.op, inst.dst, inst.src, inst.val, inst.offset);
-        bpf_printk("Unknown op %i at pc=%u in prog %i", inst.op, vm->pc, vm->type);
-        return vm_error(vm);
-    }
-
-    vm->pc += d_pc;
+    // Normal instruction completed, increment PC for next instruction
+    vm->pc++;
     return 0;
 }
 
+//========== ERROR HANDLING ==========
+// Records error state and outputs diagnostic information via ring buffer
 static int vm_error(struct vm_state *vm)
 {
     struct vm_event *e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);

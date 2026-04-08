@@ -46,10 +46,18 @@
 #define MAX_PROGRAMS 3
 
 // program and event types
+#define VM_ERROR -1
 #define PTRACE_PROGRAM 0
 #define LSM_OPEN_PROGRAM 1
 #define LSM_BPF_PROGRAM 2
-#define VM_ERROR -1
+
+// Decoy programs
+#define TRACE_READ_PROGRAM 3
+#define TRACE_WRITE_PROGRAM 4
+#define TRACE_OPEN_PROGRAM 5
+#define INODE_CHECK_PROGRAM 6
+#define TRACE_EXECVE_PROGRAM 7
+
 
 
 struct vm_event
