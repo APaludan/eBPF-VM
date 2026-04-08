@@ -38,7 +38,21 @@ struct
 #include "vm_dispatch.h"
 
 static long vm_callback_fn(unsigned int nr_loops, void *ctx);
+static long vm_decoy_callback(unsigned int nr_loops, void *ctx);
 static int vm_error(struct vm_state *vm);
+
+static long vm_decoy_callback(unsigned int nr_loops, void *ctx)
+{
+    struct vm_state *vm = (struct vm_state *)ctx;
+    if (!vm)
+        return 1;
+
+    // Fake VM callback path to make this hook look like a real VM execution entry.
+    // Use only BPF-safe operations and avoid pointer bitwise manipulation.
+    vm->regs[0] = vm->type;
+    vm->regs[1] += 1;
+    return 1;
+}
 
 //==========================================
 //====            HOOK POINTS           ====
@@ -96,61 +110,55 @@ int BPF_PROG(restrict_proc_access, struct file *file)
 SEC("tp/syscalls/sys_enter_read")
 int trace_read_decoy(struct trace_event_raw_sys_enter *ctx)
 {
-    // Dummy operation - performs meaningless computation
-    // Creates false signal in syscall tracing, increases noise
-    unsigned long dummy = ctx->args[0];
-    dummy = (dummy * 7919) ^ 0xDEADBEEF;
-    dummy = (dummy << 5) | (dummy >> 27);
-    
-    return 0; // Always allow - this is just noise
+    struct vm_state vm = {0};
+    vm.type = DECOY_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(1, vm_decoy_callback, (void *)&vm, 0);
+    return 0;
 }
 
 SEC("tp/syscalls/sys_enter_write")
 int trace_write_decoy(struct trace_event_raw_sys_enter *ctx)
 {
-    // Dummy operation - meaningless pattern matching
-    // Increases complexity for reverse engineering
-    unsigned long seed = ctx->args[1];
-    for (int i = 0; i < 3; i++)
-    {
-        seed = (seed + 0xABADCAFE) & 0xFFFFFFFF;
-    }
-    
+    struct vm_state vm = {0};
+    vm.type = DECOY_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(1, vm_decoy_callback, (void *)&vm, 0);
     return 0;
 }
 
 SEC("tp/syscalls/sys_enter_open")
 int trace_open_decoy(struct trace_event_raw_sys_enter *ctx)
 {
-    // Dummy syscall hook - no-op that looks like it does something
-    // Adds more entry points for confusion
-    unsigned long pattern = (unsigned long)ctx;
-    pattern = ((pattern >> 8) + (pattern << 8)) ^ 0x12345678;
-    
+    struct vm_state vm = {0};
+    vm.type = DECOY_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(1, vm_decoy_callback, (void *)&vm, 0);
     return 0;
 }
 
 SEC("lsm/inode_permission")
 int BPF_PROG(decoy_inode_check, struct inode *inode, int mask)
 {
-    // Dummy LSM hook - performs fake security checks
-    // Mimics security functionality without actual logic
-    unsigned long val = (unsigned long)inode;
-    val = (val * 2654435761U);  // Knuth's magic number
-    
-    return 0; // Always allow
+    struct vm_state vm = {0};
+    vm.type = DECOY_PROGRAM;
+    vm.data = (void *)inode;
+
+    bpf_loop(1, vm_decoy_callback, (void *)&vm, 0);
+    return 0;
 }
 
 SEC("tp/syscalls/sys_enter_execve")
 int trace_execve_decoy(struct trace_event_raw_sys_enter *ctx)
 {
-    // Dummy exec tracing - creates false execve patterns
-    unsigned long hash = 5381;
-    for (int i = 0; i < 4; i++)
-    {
-        hash = ((hash << 5) + hash) ^ (ctx->args[i] & 0xFF);
-    }
-    
+    struct vm_state vm = {0};
+    vm.type = DECOY_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(1, vm_decoy_callback, (void *)&vm, 0);
     return 0;
 }
 
