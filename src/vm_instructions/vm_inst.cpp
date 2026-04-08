@@ -137,10 +137,18 @@ std::vector<uint8_t> serialize_inst(const vm_inst& inst) {
     };
 
     append(&inst.op,     sizeof(inst.op));     // 2 bytes
-    append(&inst.dst,    sizeof(inst.dst));    // 2 bytes
-    append(&inst.src,    sizeof(inst.src));    // 2 bytes
-    append(&inst.val,    sizeof(inst.val));    // 8 bytes
-    append(&inst.offset, sizeof(inst.offset)); // 2 bytes
+    if (have_dst(inst.op)) {
+        append(&inst.dst,    sizeof(inst.dst));    // 2 bytes
+    }
+    if (have_src(inst.op)) {
+        append(&inst.src,    sizeof(inst.src));    // 2 bytes
+    }
+    if (have_val(inst.op)) {
+        append(&inst.val,    sizeof(inst.val));    // 8 bytes
+    }
+    if (have_offset(inst.op)) {
+        append(&inst.offset, sizeof(inst.offset)); // 2 bytes
+    }
 
     return buffer;
 }

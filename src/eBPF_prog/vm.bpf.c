@@ -12,7 +12,7 @@
 static long vm_callback_fn(unsigned int nr_loops, void *ctx);
 static int vm_error(struct vm_state *vm);
 static bool decrypt_inst(struct vm_inst *inst, int program_counter);
-bool deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm);
+int deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm);
 
 //==========================================
 //====          MAP STRUCTURES          ====
@@ -93,7 +93,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     struct vm_state *vm = (struct vm_state *)ctx;
     struct vm_inst inst = {0};
 
-    deserialize_next_inst(&inst, vm);
+    int d_pc = deserialize_next_inst(&inst, vm);
     decrypt_inst(&inst, vm->pc);
 
 
@@ -254,7 +254,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
         return vm_error(vm);
     }
 
-    vm->pc++;
+    vm->pc += d_pc;
     return 0;
 }
 
@@ -325,23 +325,37 @@ static bool get_uint64(unsigned int *idx, uint64_t *dst)
 /// @param inst
 /// @param vm
 /// @return true if success, false otherwise
-bool deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm)
+int deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm)
 {
     if (!inst || !vm)
-        return false;
+        return -1;
     // Fetch encrypted instruction (uses defined vm type in hook point logic to get the right instruction in programs map)
     // PTRACE_PROGRAM = 0 (defined in vm.h) has the first VM_MAX_INSTRUCTIONS entries of the map
     // LSM_OPEN_PROGRAM = 1 (defined in vm.h) has the entries after the first VM_MAX_INSTRUCTIONS entries of the map
     // TODO: make more memory effecient a lot of unused slots atm
     unsigned int program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc * sizeof(struct vm_inst);
 
-    get_uint16(&program_index_pc, (uint16_t *)&inst->op);
-    get_uint16(&program_index_pc, (uint16_t *)&inst->dst);
-    get_uint16(&program_index_pc, (uint16_t *)&inst->src);
-    get_uint64(&program_index_pc, (uint64_t *)&inst->val);
-    get_uint16(&program_index_pc, (uint16_t *)&inst->offset);
+    int d_pc = 0;
 
-    return true;
+    get_uint16(&program_index_pc, (uint16_t *)&inst->op);
+    if (have_dst(inst->op)) {
+        get_uint16(&program_index_pc, (uint16_t *)&inst->dst);
+        d_pc += 2;
+    }
+    if (have_src(inst->op)) {
+        get_uint16(&program_index_pc, (uint16_t *)&inst->src);
+        d_pc += 2;
+    }
+    if (have_val(inst->op)) {
+        get_uint64(&program_index_pc, (uint64_t *)&inst->val);
+        d_pc += 8;
+    }
+    if (have_offset(inst->op)) {
+        get_uint16(&program_index_pc, (uint16_t *)&inst->offset);
+        d_pc += 2;
+    }
+
+    return d_pc;
 }
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";

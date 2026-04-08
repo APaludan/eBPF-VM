@@ -97,37 +97,49 @@ static inline void xor_rolling(struct vm_inst *data, int key)
     data->offset ^= (short)next_key(&key);
 }
 
-// static bool have_src(int op)
-// {
-//     switch (op)
-//     {
-//     case 1:
-//     case 10 ... 15:
-//     case 31 ... 34:
-//     case 42 ... 43:
-//     case 45:
-//     case 47:
-//     case 60 ... 62:
-//         return true;
+static bool have_src(int op)
+{
+    switch (op)
+    {
+    case 1:
+    case 10 ... 15:
+    case 31 ... 34:
+    case 42 ... 43:
+    case 45:
+    case 47:
+    case 60 ... 62:
+        return true;
 
-//     default:
-//         return false;
-//     }
-// }
+    default:
+        return false;
+    }
+}
 
-// static bool have_dst(int op)
-// {
-//     switch (op)
-//     {
-//     case 1:
-//     case 10 ... 15:
-//     case 31 ... 34:
-//     case 40 ... 41:
-//     case 43 ... 44:
-//     case 46 ... 47:
-//         return true;
+static bool have_dst(int op)
+{
+    switch (op)
+    {
+    case 1:
+    case 10 ... 15:
+    case 31 ... 34:
+    case 40 ... 41:
+    case 43 ... 44:
+    case 46 ... 47:
+        return true;
 
-//     default:
-//         return false;
-//     }
-// }
+    default:
+        return false;
+    }
+}
+
+
+static bool have_val(int op)
+{
+    return true;
+}
+
+
+static bool have_offset(int op)
+{
+    return op == OP_READ_CTX;
+}
