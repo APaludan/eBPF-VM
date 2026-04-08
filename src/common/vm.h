@@ -105,7 +105,7 @@ static inline void xor_rolling(struct vm_inst *data, int key)
     data->offset ^= (short)next_key(&key);
 }
 
-static bool have_src(int op)
+static inline bool have_src(int op)
 {
     switch (op)
     {
@@ -123,7 +123,7 @@ static bool have_src(int op)
     }
 }
 
-static bool have_dst(int op)
+static inline bool have_dst(int op)
 {
     switch (op)
     {
@@ -141,7 +141,7 @@ static bool have_dst(int op)
 }
 
 
-static bool have_val(int op)
+static inline bool have_val(int op)
 {
     switch (op)
     {
@@ -158,7 +158,7 @@ static bool have_val(int op)
 }
 
 
-static bool have_offset(int op)
+static inline bool have_offset(int op)
 {
     return op == OP_READ_CTX;
 }
