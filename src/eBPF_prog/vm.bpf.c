@@ -45,7 +45,6 @@ struct
 static long vm_callback_fn(unsigned int nr_loops, void *ctx);
 static int vm_error(struct vm_state *vm);
 
-
 //==========================================
 //====            HOOK POINTS           ====
 //==========================================
@@ -166,12 +165,12 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     struct vm_state *vm = (struct vm_state *)ctx;
     struct vm_inst inst = {0};
 
-    
     int d_pc = deserialize_next_inst(&inst, vm);
-    //decrypt_inst(&inst, vm->pc);
-    
-    if (d_pc == -1) return 1;
-    
+    // decrypt_inst(&inst, vm->pc);
+
+    if (d_pc == -1)
+        return 1;
+
     //========== INSTRUCTION VALIDATION ==========
     inst.dst &= VM_NUM_REGS - 1;
     inst.src &= VM_NUM_REGS - 1;
@@ -185,7 +184,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     //========== INSTRUCTION EXECUTION DISPATCH ==========
     // Dispatch instruction to appropriate handler based on category
     long dispatch_result = vm_execute_instruction(&inst, vm);
-    
+
     if (dispatch_result == 1)
     {
         // Error occurred or exit requested
@@ -270,40 +269,37 @@ static bool get_uint64(unsigned int *idx, uint64_t *dst)
 /// @brief get the next instruction from `programs` map and save data in `inst`.
 /// @param inst
 /// @param vm
-/// @return true if success, false otherwise
+/// @return size of instruction in bytes if success, -1 if error
 int deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm)
 {
     if (!inst || !vm)
         return -1;
-    // Fetch encrypted instruction (uses defined vm type in hook point logic to get the right instruction in programs map)
-    // PTRACE_PROGRAM = 0 (defined in vm.h) has the first VM_MAX_INSTRUCTIONS entries of the map
-    // LSM_OPEN_PROGRAM = 1 (defined in vm.h) has the entries after the first VM_MAX_INSTRUCTIONS entries of the map
-    // TODO: make more memory effecient a lot of unused slots atm
+
+
     int d_pc = 0;
     unsigned int program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc + d_pc;
 
-    
     get_uint16(&program_index_pc, (uint16_t *)&inst->op);
     d_pc += 2;
-    if (have_dst(inst->op)) {
+    if (have_dst(inst->op))
+    {
         get_uint16(&program_index_pc, (uint16_t *)&inst->dst);
         d_pc += 2;
-        program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc + d_pc;
     }
-    if (have_src(inst->op)) {
+    if (have_src(inst->op))
+    {
         get_uint16(&program_index_pc, (uint16_t *)&inst->src);
         d_pc += 2;
-        program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc + d_pc;
     }
-    if (have_val(inst->op)) {
+    if (have_val(inst->op))
+    {
         get_uint64(&program_index_pc, (uint64_t *)&inst->val);
         d_pc += 8;
-        program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc + d_pc;
     }
-    if (have_offset(inst->op)) {
+    if (have_offset(inst->op))
+    {
         get_uint16(&program_index_pc, (uint16_t *)&inst->offset);
         d_pc += 2;
-        program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc + d_pc;
     }
 
     return d_pc;
