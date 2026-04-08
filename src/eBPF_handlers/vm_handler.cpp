@@ -30,18 +30,20 @@ int vm_handler::ring_buffer_callback(void *ctx, void *data, size_t data_size)
 
 int vm_handler::populate_map(int program_type, std::vector<vm_inst> program, bpf_map *map_fd, unsigned int key)
 {
+    size_t idx_offset = 0;
     for (uint32_t i = 0; i < program.size(); i++)
     {
         vm_inst inst = program[i];
 
-        xor_rolling(&inst, key + i);
+        // xor_rolling(&inst, key + i);
 
         auto bytes = serialize_inst(inst);
         for (size_t j = 0; j < bytes.size(); j++)
         {
             auto b = bytes[j];
-            unsigned int idx = program_type * VM_MAX_INSTRUCTIONS + i*sizeof(vm_inst) + j;
+            unsigned int idx = program_type * VM_MAX_INSTRUCTIONS + idx_offset;
             bpf_map__update_elem(map_fd, &idx, sizeof(idx), &b, sizeof(uint8_t), 0);
+            idx_offset++;
         }
     }
 

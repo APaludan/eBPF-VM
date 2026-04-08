@@ -143,7 +143,18 @@ static bool have_dst(int op)
 
 static bool have_val(int op)
 {
-    return true;
+    switch (op)
+    {
+    case 1:
+    case 10 ... 15:
+    case 30 ... 35:
+    case 40:
+    case 42 ... 44:
+        return true;
+    
+    default:
+        return false;
+    }
 }
 
 

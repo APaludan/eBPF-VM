@@ -5,13 +5,65 @@ std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid);
 std::vector<vm_inst> make_ptrace_program(pid_t protected_pid);
 std::vector<vm_inst> make_lsm_bpf_program();
 
+bool is_jump_op(unsigned short op)
+{
+    return op >= OP_JMP && op <= OP_JGTEQ;
+}
+
+// Converts all jump instructions to bytes
+void fix_jumps(std::vector<vm_inst> &program)
+{
+    std::vector<size_t> sizes;
+    for (const auto &inst : program)
+    {
+        auto bytes = serialize_inst(inst);
+        sizes.push_back(bytes.size());
+    }
+
+    for (size_t i = 0; i < program.size(); i++)
+    {
+        auto &inst = program[i];
+        if (!is_jump_op(inst.op))
+            continue;
+
+        long long target_inst_idx = i + inst.val;
+        long long jump = 0;
+        long long idx = i;
+
+        if (inst.val > 0)
+        {
+            while (idx < target_inst_idx)
+            {
+                long long inst_size = sizes[idx];
+                jump += inst_size;
+                idx++;
+            }
+        }
+        else if (inst.val < 0)
+        {
+            idx--;
+            while (idx >= target_inst_idx)
+            {
+                long long inst_size = sizes[idx];
+                jump -= inst_size;
+                idx--;
+            }
+        }
+
+        inst.val = jump;
+    }
+}
+
 std::unordered_map<int, std::vector<vm_inst>> generate_programs(pid_t protected_pid)
 {
     std::unordered_map<int, std::vector<vm_inst>> program_map;
 
     program_map[PTRACE_PROGRAM] = make_ptrace_program(protected_pid);
+    fix_jumps(program_map[PTRACE_PROGRAM]);
     program_map[LSM_OPEN_PROGRAM] = make_lsm_open_program(protected_pid);
+    fix_jumps(program_map[LSM_OPEN_PROGRAM]);
     program_map[LSM_BPF_PROGRAM] = make_lsm_bpf_program();
+    fix_jumps(program_map[LSM_BPF_PROGRAM]);
 
     return program_map;
 }
@@ -125,30 +177,36 @@ std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid)
     };
 };
 
-
-std::vector<uint8_t> serialize_inst(const vm_inst& inst) {
+std::vector<uint8_t> serialize_inst(const vm_inst &inst)
+{
     std::vector<uint8_t> buffer(sizeof(vm_inst));
     size_t pos = 0;
 
     // Helper to copy bytes and advance position
-    auto append = [&](const void* src, size_t size) {
+    auto append = [&](const void *src, size_t size)
+    {
         std::memcpy(buffer.data() + pos, src, size);
         pos += size;
     };
 
-    append(&inst.op,     sizeof(inst.op));     // 2 bytes
-    if (have_dst(inst.op)) {
-        append(&inst.dst,    sizeof(inst.dst));    // 2 bytes
+    append(&inst.op, sizeof(inst.op)); // 2 bytes
+    if (have_dst(inst.op))
+    {
+        append(&inst.dst, sizeof(inst.dst)); // 2 bytes
     }
-    if (have_src(inst.op)) {
-        append(&inst.src,    sizeof(inst.src));    // 2 bytes
+    if (have_src(inst.op))
+    {
+        append(&inst.src, sizeof(inst.src)); // 2 bytes
     }
-    if (have_val(inst.op)) {
-        append(&inst.val,    sizeof(inst.val));    // 8 bytes
+    if (have_val(inst.op))
+    {
+        append(&inst.val, sizeof(inst.val)); // 8 bytes
     }
-    if (have_offset(inst.op)) {
+    if (have_offset(inst.op))
+    {
         append(&inst.offset, sizeof(inst.offset)); // 2 bytes
     }
 
+    buffer.resize(pos);
     return buffer;
 }

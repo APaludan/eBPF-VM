@@ -87,6 +87,7 @@ int BPF_PROG(restrict_proc_access, struct file *file)
     vm.data = (void *)file;
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    // bpf_printk("pc %u", vm.pc);
 
     return 0; // keep for testing
 
@@ -165,10 +166,12 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     struct vm_state *vm = (struct vm_state *)ctx;
     struct vm_inst inst = {0};
 
+    
     int d_pc = deserialize_next_inst(&inst, vm);
-    decrypt_inst(&inst, vm->pc);
-
-
+    //decrypt_inst(&inst, vm->pc);
+    
+    if (d_pc == -1) return 1;
+    
     //========== INSTRUCTION VALIDATION ==========
     inst.dst &= VM_NUM_REGS - 1;
     inst.src &= VM_NUM_REGS - 1;
@@ -195,7 +198,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     }
 
     // Normal instruction completed, increment PC for next instruction
-    vm->pc++;
+    vm->pc += d_pc;
     return 0;
 }
 
@@ -276,26 +279,31 @@ int deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm)
     // PTRACE_PROGRAM = 0 (defined in vm.h) has the first VM_MAX_INSTRUCTIONS entries of the map
     // LSM_OPEN_PROGRAM = 1 (defined in vm.h) has the entries after the first VM_MAX_INSTRUCTIONS entries of the map
     // TODO: make more memory effecient a lot of unused slots atm
-    unsigned int program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc * sizeof(struct vm_inst);
-
     int d_pc = 0;
+    unsigned int program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc + d_pc;
 
+    
     get_uint16(&program_index_pc, (uint16_t *)&inst->op);
+    d_pc += 2;
     if (have_dst(inst->op)) {
         get_uint16(&program_index_pc, (uint16_t *)&inst->dst);
         d_pc += 2;
+        program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc + d_pc;
     }
     if (have_src(inst->op)) {
         get_uint16(&program_index_pc, (uint16_t *)&inst->src);
         d_pc += 2;
+        program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc + d_pc;
     }
     if (have_val(inst->op)) {
         get_uint64(&program_index_pc, (uint64_t *)&inst->val);
         d_pc += 8;
+        program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc + d_pc;
     }
     if (have_offset(inst->op)) {
         get_uint16(&program_index_pc, (uint16_t *)&inst->offset);
         d_pc += 2;
+        program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc + d_pc;
     }
 
     return d_pc;
