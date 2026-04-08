@@ -49,6 +49,7 @@
 #define PTRACE_PROGRAM 0
 #define LSM_OPEN_PROGRAM 1
 #define LSM_BPF_PROGRAM 2
+#define DECOY_PROGRAM 3
 #define VM_ERROR -1
 
 
