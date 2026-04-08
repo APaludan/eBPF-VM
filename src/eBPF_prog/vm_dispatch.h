@@ -120,13 +120,13 @@ static inline long vm_exec_control_flow_ops(struct vm_inst *inst, struct vm_stat
     {
     case OP_JMP:
         vm->pc += inst->val;
-        return 0; // Return early, don't increment pc again
+        return 100; // Return early, don't increment pc again
 
     case OP_JEQ:
         if (vm->regs[inst->dst] == vm->regs[inst->src])
         {
             vm->pc += inst->val;
-            return 0; // Return early
+            return 100; // Return early
         }
         break;
 
@@ -134,7 +134,7 @@ static inline long vm_exec_control_flow_ops(struct vm_inst *inst, struct vm_stat
         if (vm->regs[inst->dst] != vm->regs[inst->src])
         {
             vm->pc += inst->val;
-            return 0; // Return early
+            return 100; // Return early
         }
         break;
 
@@ -142,7 +142,7 @@ static inline long vm_exec_control_flow_ops(struct vm_inst *inst, struct vm_stat
         if (vm->regs[inst->dst] > vm->regs[inst->src])
         {
             vm->pc += inst->val;
-            return 0;
+            return 100;
         }
         break;
 
@@ -150,7 +150,7 @@ static inline long vm_exec_control_flow_ops(struct vm_inst *inst, struct vm_stat
         if (vm->regs[inst->dst] >= vm->regs[inst->src])
         {
             vm->pc += inst->val;
-            return 0;
+            return 100;
         }
         break;
 

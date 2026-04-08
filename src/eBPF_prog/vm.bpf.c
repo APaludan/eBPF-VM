@@ -9,6 +9,7 @@
 #include "vm.h"
 #include <errno.h>
 
+
 //==========================================
 //====          MAP STRUCTURES          ====
 //==========================================
@@ -202,7 +203,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
         // Error occurred or exit requested
         return dispatch_result;
     }
-    else if (dispatch_result != 0)
+    else if (dispatch_result == 100)
     {
         // Control flow instruction handled the PC update
         return 0;
