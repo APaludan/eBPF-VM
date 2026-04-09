@@ -48,7 +48,7 @@ void fix_jumps(std::vector<vm_inst> &program)
             continue;
 
         long long target_inst_idx = i + inst.val;
-        long long jump = 0;
+        long long jump_in_bytes = 0;
         long long idx = i;
 
         if (inst.val > 0)
@@ -56,7 +56,7 @@ void fix_jumps(std::vector<vm_inst> &program)
             while (idx < target_inst_idx)
             {
                 long long inst_size = sizes[idx];
-                jump += inst_size;
+                jump_in_bytes += inst_size;
                 idx++;
             }
         }
@@ -66,12 +66,12 @@ void fix_jumps(std::vector<vm_inst> &program)
             while (idx >= target_inst_idx)
             {
                 long long inst_size = sizes[idx];
-                jump -= inst_size;
+                jump_in_bytes -= inst_size;
                 idx--;
             }
         }
 
-        inst.val = jump;
+        inst.val = jump_in_bytes;
     }
 }
 
