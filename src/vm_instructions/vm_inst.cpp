@@ -31,47 +31,21 @@ size_t inst_serialized_size(const vm_inst &inst)
     return size;
 }
 
-// Converts all values of jump instructions to bytes
-void fix_jumps(std::vector<vm_inst> &program)
-{
-    std::vector<size_t> sizes;
-    for (const auto &inst : program)
-    {
-        auto size = inst_serialized_size(inst);
-        sizes.push_back(size);
+void fix_jumps(std::vector<vm_inst>& program) {
+    // sums of instruction sizes
+    // offsets[i] = the byte offset of the instruction at program[i].
+    std::vector<size_t> offsets(program.size() + 1, 0);
+    for (size_t i = 0; i < program.size(); i++) {
+        offsets[i + 1] = offsets[i] + inst_serialized_size(program[i]);
     }
 
-    for (size_t i = 0; i < program.size(); i++)
-    {
-        auto &inst = program[i];
-        if (!is_jump_op(inst.op))
-            continue;
-
-        long long target_inst_idx = i + inst.val;
-        long long jump_in_bytes = 0;
-        long long idx = i;
-
-        if (inst.val > 0)
-        {
-            while (idx < target_inst_idx)
-            {
-                long long inst_size = sizes[idx];
-                jump_in_bytes += inst_size;
-                idx++;
-            }
+    for (size_t i = 0; i < program.size(); ++i) {
+        auto& inst = program[i];
+        
+        if (is_jump_op(inst.op)) {
+            size_t target_idx = i + inst.val;
+            inst.val = offsets[target_idx] - offsets[i];
         }
-        else if (inst.val < 0)
-        {
-            idx--;
-            while (idx >= target_inst_idx)
-            {
-                long long inst_size = sizes[idx];
-                jump_in_bytes -= inst_size;
-                idx--;
-            }
-        }
-
-        inst.val = jump_in_bytes;
     }
 }
 
