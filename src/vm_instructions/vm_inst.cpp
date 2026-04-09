@@ -9,15 +9,36 @@ bool is_jump_op(unsigned short op)
 {
     return op >= OP_JMP && op <= OP_JGTEQ;
 }
+size_t inst_serialized_size(const vm_inst &inst)
+{
+    size_t size = 2;
+    if (have_dst(inst.op))
+    {
+        size += 2;
+    }
+    if (have_src(inst.op))
+    {
+        size += 2;
+    }
+    if (have_val(inst.op))
+    {
+        size += 8;
+    }
+    if (have_offset(inst.op))
+    {
+        size += 2;
+    }
+    return size;
+}
 
-// Converts all jump instructions to bytes
+// Converts all values of jump instructions to bytes
 void fix_jumps(std::vector<vm_inst> &program)
 {
     std::vector<size_t> sizes;
     for (const auto &inst : program)
     {
-        auto bytes = serialize_inst(inst, 0);
-        sizes.push_back(bytes.size());
+        auto size = inst_serialized_size(inst);
+        sizes.push_back(size);
     }
 
     for (size_t i = 0; i < program.size(); i++)

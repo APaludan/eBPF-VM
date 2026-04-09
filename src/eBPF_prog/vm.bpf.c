@@ -164,8 +164,8 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     struct vm_state *vm = (struct vm_state *)ctx;
     struct vm_inst inst = {0};
 
-    int d_pc = deserialize_next_inst(&inst, vm);
-    if (d_pc == -1)
+    int size = deserialize_next_inst(&inst, vm);
+    if (size == -1)
         return 1;
 
     //========== INSTRUCTION VALIDATION ==========
@@ -194,7 +194,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     }
 
     // Normal instruction completed, increment PC for next instruction
-    vm->pc += d_pc;
+    vm->pc += size;
     return 0;
 }
 
@@ -272,38 +272,38 @@ int deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm)
         return -1;
     int key = *key_ptr + vm->pc;
 
-    int d_pc = 0;
+    int size = 0;
     unsigned int program_index_pc = vm->type * VM_MAX_PROGRAM_SIZE + vm->pc;
 
     if (!get_uint16(&program_index_pc, (uint16_t *)&inst->op))
         return -1;
 
     unsigned short decrypted_op = peek_op(inst, key);
-    d_pc += 2;
+    size += 2;
     if (have_dst(decrypted_op))
     {
         get_uint16(&program_index_pc, (uint16_t *)&inst->dst);
-        d_pc += 2;
+        size += 2;
     }
     if (have_src(decrypted_op))
     {
         get_uint16(&program_index_pc, (uint16_t *)&inst->src);
-        d_pc += 2;
+        size += 2;
     }
     if (have_val(decrypted_op))
     {
         get_uint64(&program_index_pc, (uint64_t *)&inst->val);
-        d_pc += 8;
+        size += 8;
     }
     if (have_offset(decrypted_op))
     {
         get_uint16(&program_index_pc, (uint16_t *)&inst->offset);
-        d_pc += 2;
+        size += 2;
     }
 
     xor_rolling(inst, key);
 
-    return d_pc;
+    return size;
 }
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
