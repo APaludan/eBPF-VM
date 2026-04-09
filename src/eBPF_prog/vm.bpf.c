@@ -11,7 +11,7 @@
 
 static long vm_callback_fn(unsigned int nr_loops, void *ctx);
 static int vm_error(struct vm_state *vm);
-int deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm);
+int get_next_inst(struct vm_inst *inst, struct vm_state *vm);
 
 //==========================================
 //====          MAP STRUCTURES          ====
@@ -164,7 +164,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     struct vm_state *vm = (struct vm_state *)ctx;
     struct vm_inst inst = {0};
 
-    int size = deserialize_next_inst(&inst, vm);
+    int size = get_next_inst(&inst, vm);
     if (size == -1)
         return 1;
 
@@ -261,7 +261,7 @@ static inline unsigned short peek_op(struct vm_inst *encrypted_inst, int key)
 /// @param inst
 /// @param vm
 /// @return size of instruction in bytes if success, -1 if error
-int deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm)
+int get_next_inst(struct vm_inst *inst, struct vm_state *vm)
 {
     if (!inst || !vm)
         return -1;
@@ -279,26 +279,26 @@ int deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm)
         return -1;
 
     unsigned short decrypted_op = peek_op(inst, key);
-    size += 2;
+    size += sizeof(inst->op);
     if (have_dst(decrypted_op))
     {
         get_uint16(&program_index_pc, (uint16_t *)&inst->dst);
-        size += 2;
+        size += sizeof(inst->dst);
     }
     if (have_src(decrypted_op))
     {
         get_uint16(&program_index_pc, (uint16_t *)&inst->src);
-        size += 2;
+        size += sizeof(inst->src);
     }
     if (have_val(decrypted_op))
     {
         get_uint64(&program_index_pc, (uint64_t *)&inst->val);
-        size += 8;
+        size += sizeof(inst->val);
     }
     if (have_offset(decrypted_op))
     {
         get_uint16(&program_index_pc, (uint16_t *)&inst->offset);
-        size += 2;
+        size += sizeof(inst->offset);
     }
 
     xor_rolling(inst, key);

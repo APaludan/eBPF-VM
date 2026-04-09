@@ -11,22 +11,22 @@ bool is_jump_op(unsigned short op)
 }
 size_t inst_serialized_size(const vm_inst &inst)
 {
-    size_t size = 2;
+    size_t size = sizeof(inst.op);
     if (have_dst(inst.op))
     {
-        size += 2;
+        size += sizeof(inst.dst);
     }
     if (have_src(inst.op))
     {
-        size += 2;
+        size += sizeof(inst.src);
     }
     if (have_val(inst.op))
     {
-        size += 8;
+        size += sizeof(inst.val);
     }
     if (have_offset(inst.op))
     {
-        size += 2;
+        size += sizeof(inst.offset);
     }
     return size;
 }
