@@ -85,7 +85,6 @@ int BPF_PROG(restrict_proc_access, struct file *file)
     vm.data = (void *)file;
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
-    // bpf_printk("pc %u", vm.pc);
 
     return 0; // keep for testing
 
