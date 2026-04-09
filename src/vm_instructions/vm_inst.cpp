@@ -140,13 +140,7 @@ std::vector<uint8_t> serialize_inst(const vm_inst inst, int key)
     // Helper to copy bytes and advance position
     auto append = [&](const void *src, size_t size)
     {
-        uint8_t data[sizeof(vm_inst)] = {0};
-        for (size_t i = 0; i < size; i++)
-        {
-            data[i] = ((uint8_t *)src)[i];
-        }
-
-        std::memcpy(buffer.data() + pos, data, size);
+        std::memcpy(buffer.data() + pos, src, size);
         pos += size;
     };
 
