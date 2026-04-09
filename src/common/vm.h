@@ -38,7 +38,7 @@
 #define OP_PRINTS 62  // prints the string at addr regs[src]
 #define OP_RINGBUF 63 // submit vm state to ringbuffer
 
-#define VM_MAX_INSTRUCTIONS 10000
+#define VM_MAX_PROGRAM_SIZE 10000
 #define VM_MAX_LOOPS 100000
 #define VM_STACK_SIZE 256
 #define VM_NUM_REGS 16 // must be a power of 2!!

@@ -35,13 +35,11 @@ int vm_handler::populate_map(int program_type, std::vector<vm_inst> program, bpf
     {
         vm_inst inst = program[i];
 
-        // xor_rolling(&inst, key + i);
-
-        auto bytes = serialize_inst(inst);
+        auto bytes = serialize_inst(inst, key + idx_offset);
         for (size_t j = 0; j < bytes.size(); j++)
         {
             auto b = bytes[j];
-            unsigned int idx = program_type * VM_MAX_INSTRUCTIONS + idx_offset;
+            unsigned int idx = program_type * VM_MAX_PROGRAM_SIZE + idx_offset;
             bpf_map__update_elem(map_fd, &idx, sizeof(idx), &b, sizeof(uint8_t), 0);
             idx_offset++;
         }

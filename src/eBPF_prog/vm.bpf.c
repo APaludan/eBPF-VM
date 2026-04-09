@@ -11,7 +11,6 @@
 
 static long vm_callback_fn(unsigned int nr_loops, void *ctx);
 static int vm_error(struct vm_state *vm);
-static bool decrypt_inst(struct vm_inst *inst, int program_counter);
 int deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm);
 
 //==========================================
@@ -35,7 +34,7 @@ struct
 struct
 {
     __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(max_entries, VM_MAX_INSTRUCTIONS * MAX_PROGRAMS * sizeof(struct vm_inst));
+    __uint(max_entries, VM_MAX_PROGRAM_SIZE * MAX_PROGRAMS);
     __type(key, unsigned int);
     __type(value, uint8_t);
 } programs SEC(".maps");
@@ -166,8 +165,6 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     struct vm_inst inst = {0};
 
     int d_pc = deserialize_next_inst(&inst, vm);
-    // decrypt_inst(&inst, vm->pc);
-
     if (d_pc == -1)
         return 1;
 
@@ -223,17 +220,6 @@ static int vm_error(struct vm_state *vm)
     return 1;
 }
 
-static bool decrypt_inst(struct vm_inst *inst, int program_counter)
-{
-    unsigned int key_idx = 0;
-    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
-    if (!key_ptr)
-        return false;
-    xor_rolling(inst, *key_ptr + program_counter);
-
-    return true;
-}
-
 // get next 8 bytes. increments `idx` by 2
 static bool get_uint16(unsigned int *idx, uint16_t *dst)
 {
@@ -242,7 +228,7 @@ static bool get_uint16(unsigned int *idx, uint16_t *dst)
     for (size_t i = 0; i < sizeof(uint16_t); i++)
     {
         b = bpf_map_lookup_elem(&programs, idx);
-        if (!b)
+        if (b == NULL)
             return false;
         *dst |= ((uint16_t)*b << (8 * i));
         *idx = *idx + 1;
@@ -258,12 +244,17 @@ static bool get_uint64(unsigned int *idx, uint64_t *dst)
     for (size_t i = 0; i < sizeof(uint64_t); i++)
     {
         b = bpf_map_lookup_elem(&programs, idx);
-        if (!b)
+        if (b == NULL)
             return false;
         *dst |= ((uint64_t)*b << (8 * i));
         *idx = *idx + 1;
     }
     return true;
+}
+
+static inline unsigned short peek_op(struct vm_inst *encrypted_inst, int key)
+{
+    return encrypted_inst->op ^ (unsigned short)next_key(&key);
 }
 
 /// @brief get the next instruction from `programs` map and save data in `inst`.
@@ -275,32 +266,42 @@ int deserialize_next_inst(struct vm_inst *inst, struct vm_state *vm)
     if (!inst || !vm)
         return -1;
 
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (key_ptr == NULL)
+        return -1;
+    int key = *key_ptr + vm->pc;
 
     int d_pc = 0;
-    unsigned int program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc + d_pc;
+    unsigned int program_index_pc = vm->type * VM_MAX_PROGRAM_SIZE + vm->pc;
 
-    get_uint16(&program_index_pc, (uint16_t *)&inst->op);
+    if (!get_uint16(&program_index_pc, (uint16_t *)&inst->op))
+        return -1;
+
+    unsigned short decrypted_op = peek_op(inst, key);
     d_pc += 2;
-    if (have_dst(inst->op))
+    if (have_dst(decrypted_op))
     {
         get_uint16(&program_index_pc, (uint16_t *)&inst->dst);
         d_pc += 2;
     }
-    if (have_src(inst->op))
+    if (have_src(decrypted_op))
     {
         get_uint16(&program_index_pc, (uint16_t *)&inst->src);
         d_pc += 2;
     }
-    if (have_val(inst->op))
+    if (have_val(decrypted_op))
     {
         get_uint64(&program_index_pc, (uint64_t *)&inst->val);
         d_pc += 8;
     }
-    if (have_offset(inst->op))
+    if (have_offset(decrypted_op))
     {
         get_uint16(&program_index_pc, (uint16_t *)&inst->offset);
         d_pc += 2;
     }
+
+    xor_rolling(inst, key);
 
     return d_pc;
 }

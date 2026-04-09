@@ -267,6 +267,6 @@ static inline long vm_execute_instruction(struct vm_inst *inst, struct vm_state 
         return result;
 
     // Unknown opcode
-    bpf_printk("Unknown opcode: %d at pc=%d", inst->op, vm->pc);
+    bpf_printk("Unknown opcode: %d at pc=%d, prog type: %i", inst->op, vm->pc, vm->type);
     return 1; // error
 }

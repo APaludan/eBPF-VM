@@ -16,7 +16,7 @@ void fix_jumps(std::vector<vm_inst> &program)
     std::vector<size_t> sizes;
     for (const auto &inst : program)
     {
-        auto bytes = serialize_inst(inst);
+        auto bytes = serialize_inst(inst, 0);
         sizes.push_back(bytes.size());
     }
 
@@ -177,34 +177,43 @@ std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid)
     };
 };
 
-std::vector<uint8_t> serialize_inst(const vm_inst &inst)
+std::vector<uint8_t> serialize_inst(const vm_inst inst, int key)
 {
+    vm_inst encrypted = inst;
+    xor_rolling(&encrypted, key);
+
     std::vector<uint8_t> buffer(sizeof(vm_inst));
     size_t pos = 0;
 
     // Helper to copy bytes and advance position
     auto append = [&](const void *src, size_t size)
     {
-        std::memcpy(buffer.data() + pos, src, size);
+        uint8_t data[sizeof(vm_inst)] = {0};
+        for (size_t i = 0; i < size; i++)
+        {
+            data[i] = ((uint8_t *)src)[i];
+        }
+
+        std::memcpy(buffer.data() + pos, data, size);
         pos += size;
     };
 
-    append(&inst.op, sizeof(inst.op)); // 2 bytes
+    append(&encrypted.op, sizeof(encrypted.op)); // 2 bytes
     if (have_dst(inst.op))
     {
-        append(&inst.dst, sizeof(inst.dst)); // 2 bytes
+        append(&encrypted.dst, sizeof(encrypted.dst)); // 2 bytes
     }
     if (have_src(inst.op))
     {
-        append(&inst.src, sizeof(inst.src)); // 2 bytes
+        append(&encrypted.src, sizeof(encrypted.src)); // 2 bytes
     }
     if (have_val(inst.op))
     {
-        append(&inst.val, sizeof(inst.val)); // 8 bytes
+        append(&encrypted.val, sizeof(encrypted.val)); // 8 bytes
     }
     if (have_offset(inst.op))
     {
-        append(&inst.offset, sizeof(inst.offset)); // 2 bytes
+        append(&encrypted.offset, sizeof(encrypted.offset)); // 2 bytes
     }
 
     buffer.resize(pos);
