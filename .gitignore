@@ -37,4 +37,5 @@ compile_commands.json
 .cache
 CPM_modules/
 
+program_map.csv
 
