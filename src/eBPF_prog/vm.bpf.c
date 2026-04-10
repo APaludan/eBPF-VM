@@ -9,6 +9,9 @@
 #include "vm.h"
 #include <errno.h>
 
+static long vm_callback_fn(unsigned int nr_loops, void *ctx);
+static int vm_error(struct vm_state *vm);
+int get_next_inst(struct vm_inst *inst, struct vm_state *vm);
 
 //==========================================
 //====          MAP STRUCTURES          ====
@@ -31,16 +34,15 @@ struct
 struct
 {
     __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(max_entries, VM_MAX_INSTRUCTIONS *MAX_PROGRAMS);
+    __uint(max_entries, VM_MAX_PROGRAM_SIZE * MAX_PROGRAMS);
     __type(key, unsigned int);
-    __type(value, struct vm_inst);
+    __type(value, uint8_t);
 } programs SEC(".maps");
 
 #include "vm_dispatch.h"
 
 static long vm_callback_fn(unsigned int nr_loops, void *ctx);
 static int vm_error(struct vm_state *vm);
-
 
 //==========================================
 //====            HOOK POINTS           ====
@@ -58,8 +60,7 @@ int BPF_PROG(restrict_bpf, int cmd, union bpf_attr *attr, unsigned int size)
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
-    int ret = (int)vm.regs[0];
-    return (ret == 0) ? 0 : -EPERM;
+    return (vm.regs[0] == 0) ? 0 : -EPERM;
 }
 
 SEC("tp/syscalls/sys_enter_ptrace")
@@ -85,10 +86,9 @@ int BPF_PROG(restrict_proc_access, struct file *file)
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
-    return 0; // remove when vm prog works correctly
+    return 0; // keep for testing
 
-    int ret = (int)vm.regs[0];
-    return (ret == 0) ? 0 : -EPERM;
+    return (vm.regs[0] == 0) ? 0 : -EPERM;
 }
 
 //------------- DECOY HOOKS (Obfuscation) -------
@@ -161,28 +161,11 @@ int trace_execve_decoy(struct trace_event_raw_sys_enter *ctx)
 static long vm_callback_fn(unsigned int nr_loops, void *ctx)
 {
     struct vm_state *vm = (struct vm_state *)ctx;
+    struct vm_inst inst = {0};
 
-    //========== INSTRUCTION FETCH & DECRYPTION ==========
-    // Fetch encrypted instruction (uses defined vm type in hook point logic to get the right instruction in programs map)
-    // PTRACE_PROGRAM = 0 (defined in vm.h) has the first VM_MAX_INSTRUCTIONS entries of the map
-    // LSM_OPEN_PROGRAM = 1 (defined in vm.h) has the entries after the first VM_MAX_INSTRUCTIONS entries of the map
-    // TODO: make more memory effecient a lot of unused slots atm
-    unsigned int program_index_pc = vm->type * VM_MAX_INSTRUCTIONS + vm->pc;
-    struct vm_inst *inst_ptr = bpf_map_lookup_elem(&programs, &program_index_pc);
-
-    if (!inst_ptr)
+    int size = get_next_inst(&inst, vm);
+    if (size == -1)
         return 1;
-
-    // Copy to stack
-    struct vm_inst inst = *inst_ptr;
-
-    // get key and decrypt instruction
-    unsigned int index = 0;
-    int *key_ptr = bpf_map_lookup_elem(&key_map, &index);
-    if (!key_ptr)
-        return vm_error(vm);
-    int key = *key_ptr;
-    xor_rolling(&inst, key + vm->pc);
 
     //========== INSTRUCTION VALIDATION ==========
     inst.dst &= VM_NUM_REGS - 1;
@@ -197,7 +180,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     //========== INSTRUCTION EXECUTION DISPATCH ==========
     // Dispatch instruction to appropriate handler based on category
     long dispatch_result = vm_execute_instruction(&inst, vm);
-    
+
     if (dispatch_result == 1)
     {
         // Error occurred or exit requested
@@ -210,7 +193,7 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     }
 
     // Normal instruction completed, increment PC for next instruction
-    vm->pc++;
+    vm->pc += size;
     return 0;
 }
 
@@ -236,6 +219,90 @@ static int vm_error(struct vm_state *vm)
     return 1;
 }
 
-//========== LICENSE ==========
+// get next 8 bytes. increments `idx` by 2
+static bool get_uint16(unsigned int *idx, uint16_t *dst)
+{
+    uint8_t *b;
+#pragma unroll
+    for (size_t i = 0; i < sizeof(uint16_t); i++)
+    {
+        b = bpf_map_lookup_elem(&programs, idx);
+        if (b == NULL)
+            return false;
+        *dst |= ((uint16_t)*b << (8 * i));
+        *idx = *idx + 1;
+    }
+    return true;
+}
+
+// get next 8 bytes. increments `idx` by 8
+static bool get_uint64(unsigned int *idx, uint64_t *dst)
+{
+    uint8_t *b;
+#pragma unroll
+    for (size_t i = 0; i < sizeof(uint64_t); i++)
+    {
+        b = bpf_map_lookup_elem(&programs, idx);
+        if (b == NULL)
+            return false;
+        *dst |= ((uint64_t)*b << (8 * i));
+        *idx = *idx + 1;
+    }
+    return true;
+}
+
+static inline unsigned short peek_op(struct vm_inst *encrypted_inst, int key)
+{
+    return encrypted_inst->op ^ (unsigned short)next_key(&key);
+}
+
+/// @brief get the next instruction from `programs` map and save data in `inst`.
+/// @param inst
+/// @param vm
+/// @return size of instruction in bytes if success, -1 if error
+int get_next_inst(struct vm_inst *inst, struct vm_state *vm)
+{
+    if (!inst || !vm)
+        return -1;
+
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (key_ptr == NULL)
+        return -1;
+    int key = *key_ptr + vm->pc;
+
+    int size = 0;
+    unsigned int program_index_pc = vm->type * VM_MAX_PROGRAM_SIZE + vm->pc;
+
+    if (!get_uint16(&program_index_pc, (uint16_t *)&inst->op))
+        return -1;
+
+    unsigned short decrypted_op = peek_op(inst, key);
+    size += sizeof(inst->op);
+    if (have_dst(decrypted_op))
+    {
+        get_uint16(&program_index_pc, (uint16_t *)&inst->dst);
+        size += sizeof(inst->dst);
+    }
+    if (have_src(decrypted_op))
+    {
+        get_uint16(&program_index_pc, (uint16_t *)&inst->src);
+        size += sizeof(inst->src);
+    }
+    if (have_val(decrypted_op))
+    {
+        get_uint64(&program_index_pc, (uint64_t *)&inst->val);
+        size += sizeof(inst->val);
+    }
+    if (have_offset(decrypted_op))
+    {
+        get_uint16(&program_index_pc, (uint16_t *)&inst->offset);
+        size += sizeof(inst->offset);
+    }
+
+    xor_rolling(inst, key);
+
+    return size;
+}
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";

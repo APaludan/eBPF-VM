@@ -3,6 +3,7 @@ enable_testing()
 add_executable(
     tests
     test_xor.cpp
+    test_fix_jumps.cpp
 )
 
 

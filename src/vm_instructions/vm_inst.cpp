@@ -1,16 +1,21 @@
 #include "vm_inst.h"
+#include <cstring>
 
 std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid);
 std::vector<vm_inst> make_ptrace_program(pid_t protected_pid);
 std::vector<vm_inst> make_lsm_bpf_program();
+
 
 std::unordered_map<int, std::vector<vm_inst>> generate_programs(pid_t protected_pid)
 {
     std::unordered_map<int, std::vector<vm_inst>> program_map;
 
     program_map[PTRACE_PROGRAM] = make_ptrace_program(protected_pid);
+    fix_jumps(program_map[PTRACE_PROGRAM]);
     program_map[LSM_OPEN_PROGRAM] = make_lsm_open_program(protected_pid);
+    fix_jumps(program_map[LSM_OPEN_PROGRAM]);
     program_map[LSM_BPF_PROGRAM] = make_lsm_bpf_program();
+    fix_jumps(program_map[LSM_BPF_PROGRAM]);
 
     return program_map;
 }
@@ -44,7 +49,7 @@ std::vector<vm_inst> make_lsm_bpf_program()
     const int cmd_link_detach = 34;
 
     return {
-        //vm_inst{OP_EXIT, 0, 0, 0, 0},
+        vm_inst{OP_EXIT, 0, 0, 0, 0},
         vm_inst{OP_LOAD, 1, 0, pid, 0},
         vm_inst{OP_CALL, 0, 0, 14, 0},   // bpf_get_current_pid_tgid
         vm_inst{OP_RSHIFT, 0, 0, 32, 0}, // r0 = pid
@@ -79,7 +84,7 @@ std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid)
     memcpy(&mem, "mem", 4);
 
     return {
-        // vm_inst(op, dst, src, val)
+        // vm_inst(op, dst, src, val, offset)
         vm_inst{OP_LOAD, 1, 0, protected_pid, 0}, // 01) r1 = protected_pid, 0
         vm_inst{OP_CALL, 0, 0, 14, 0},            // 02) bpf_get_current_pid_tgid, 1
         vm_inst{OP_RSHIFT, 0, 0, 32, 0},          // 03) r0 = pid, 2
@@ -123,3 +128,85 @@ std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid)
         vm_inst{OP_EXIT, 0, 0, 0, 0}, // 36) exit if not protected filename
     };
 };
+
+std::vector<uint8_t> serialize_inst(const vm_inst inst, int key)
+{
+    vm_inst encrypted = inst;
+    xor_rolling(&encrypted, key);
+
+    std::vector<uint8_t> buffer(sizeof(vm_inst));
+    size_t pos = 0;
+
+    // Helper to copy bytes and advance position
+    auto append = [&](const void *src, size_t size)
+    {
+        std::memcpy(buffer.data() + pos, src, size);
+        pos += size;
+    };
+
+    append(&encrypted.op, sizeof(encrypted.op)); // 2 bytes
+    if (have_dst(inst.op))
+    {
+        append(&encrypted.dst, sizeof(encrypted.dst)); // 2 bytes
+    }
+    if (have_src(inst.op))
+    {
+        append(&encrypted.src, sizeof(encrypted.src)); // 2 bytes
+    }
+    if (have_val(inst.op))
+    {
+        append(&encrypted.val, sizeof(encrypted.val)); // 8 bytes
+    }
+    if (have_offset(inst.op))
+    {
+        append(&encrypted.offset, sizeof(encrypted.offset)); // 2 bytes
+    }
+
+    buffer.resize(pos);
+    return buffer;
+}
+
+
+bool is_jump_op(unsigned short op)
+{
+    return op >= OP_JMP && op <= OP_JGTEQ;
+}
+size_t inst_serialized_size(const vm_inst &inst)
+{
+    size_t size = sizeof(inst.op);
+    if (have_dst(inst.op))
+    {
+        size += sizeof(inst.dst);
+    }
+    if (have_src(inst.op))
+    {
+        size += sizeof(inst.src);
+    }
+    if (have_val(inst.op))
+    {
+        size += sizeof(inst.val);
+    }
+    if (have_offset(inst.op))
+    {
+        size += sizeof(inst.offset);
+    }
+    return size;
+}
+
+void fix_jumps(std::vector<vm_inst>& program) {
+    // sums of instruction sizes
+    // offsets[i] = the byte offset of the instruction at program[i].
+    std::vector<size_t> offsets(program.size() + 1, 0);
+    for (size_t i = 0; i < program.size(); i++) {
+        offsets[i + 1] = offsets[i] + inst_serialized_size(program[i]);
+    }
+
+    for (size_t i = 0; i < program.size(); ++i) {
+        auto& inst = program[i];
+        
+        if (is_jump_op(inst.op)) {
+            size_t target_idx = i + inst.val;
+            inst.val = offsets[target_idx] - offsets[i];
+        }
+    }
+}
