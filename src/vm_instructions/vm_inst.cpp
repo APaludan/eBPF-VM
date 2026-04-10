@@ -188,10 +188,6 @@ bool is_jump_op(unsigned short op)
 {
     return op >= OP_JMP && op <= OP_JGTEQ;
 }
-<<<<<<< HEAD
-=======
-
->>>>>>> junk_inst_gen
 size_t inst_serialized_size(const vm_inst &inst)
 {
     size_t size = sizeof(inst.op);
