@@ -1,4 +1,5 @@
 #include "vm_inst.h"
+#include "junk_inst.h"
 #include <cstring>
 
 std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid);
@@ -6,16 +7,32 @@ std::vector<vm_inst> make_ptrace_program(pid_t protected_pid);
 std::vector<vm_inst> make_lsm_bpf_program();
 
 
-std::unordered_map<int, std::vector<vm_inst>> generate_programs(pid_t protected_pid)
+std::unordered_map<int, std::vector<vm_inst>> generate_programs(pid_t protected_pid, int with_junk)
 {
     std::unordered_map<int, std::vector<vm_inst>> program_map;
 
-    program_map[PTRACE_PROGRAM] = make_ptrace_program(protected_pid);
-    fix_jumps(program_map[PTRACE_PROGRAM]);
-    program_map[LSM_OPEN_PROGRAM] = make_lsm_open_program(protected_pid);
-    fix_jumps(program_map[LSM_OPEN_PROGRAM]);
-    program_map[LSM_BPF_PROGRAM] = make_lsm_bpf_program();
-    fix_jumps(program_map[LSM_BPF_PROGRAM]);
+    if (with_junk == 1)
+    {
+        program_map[PTRACE_PROGRAM] = make_ptrace_program(protected_pid);
+        fix_jumps(program_map[PTRACE_PROGRAM]);
+        program_map[LSM_OPEN_PROGRAM] = make_lsm_open_program(protected_pid);
+        fix_jumps(program_map[LSM_OPEN_PROGRAM]);
+        program_map[LSM_BPF_PROGRAM] = make_lsm_bpf_program();
+        fix_jumps(program_map[LSM_BPF_PROGRAM]);
+    }
+
+    if (with_junk != 1)
+    {
+        program_map[PTRACE_PROGRAM] = generate_junk_inst(make_ptrace_program(protected_pid));
+        fix_jumps(program_map[PTRACE_PROGRAM]);
+        program_map[LSM_OPEN_PROGRAM] = generate_junk_inst(make_lsm_open_program(protected_pid));
+        fix_jumps(program_map[LSM_OPEN_PROGRAM]);
+        program_map[LSM_BPF_PROGRAM] = generate_junk_inst(make_lsm_bpf_program());
+        fix_jumps(program_map[LSM_BPF_PROGRAM]);        
+    }
+
+
+    print_program_map_to_csv(program_map, "program_map.csv");
 
     return program_map;
 }
@@ -171,6 +188,7 @@ bool is_jump_op(unsigned short op)
 {
     return op >= OP_JMP && op <= OP_JGTEQ;
 }
+
 size_t inst_serialized_size(const vm_inst &inst)
 {
     size_t size = sizeof(inst.op);
