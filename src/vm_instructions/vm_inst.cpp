@@ -7,11 +7,11 @@ std::vector<vm_inst> make_ptrace_program(pid_t protected_pid);
 std::vector<vm_inst> make_lsm_bpf_program();
 
 
-std::unordered_map<int, std::vector<vm_inst>> generate_programs(pid_t protected_pid, int with_junk)
+std::unordered_map<int, std::vector<vm_inst>> generate_programs(pid_t protected_pid, bool with_junk)
 {
     std::unordered_map<int, std::vector<vm_inst>> program_map;
 
-    if (with_junk == 1)
+    if (with_junk == false)
     {
         program_map[PTRACE_PROGRAM] = make_ptrace_program(protected_pid);
         fix_jumps(program_map[PTRACE_PROGRAM]);
@@ -21,7 +21,7 @@ std::unordered_map<int, std::vector<vm_inst>> generate_programs(pid_t protected_
         fix_jumps(program_map[LSM_BPF_PROGRAM]);
     }
 
-    if (with_junk != 1)
+    if (with_junk == true)
     {
         program_map[PTRACE_PROGRAM] = generate_junk_inst(make_ptrace_program(protected_pid));
         fix_jumps(program_map[PTRACE_PROGRAM]);
