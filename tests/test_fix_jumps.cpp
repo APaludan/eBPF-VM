@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 #include <vm_inst.h>
 
-
 TEST(FixJumpTest, JumpForward1)
 {
     auto program = std::vector({
@@ -14,7 +13,7 @@ TEST(FixJumpTest, JumpForward1)
 
     fix_jumps(program);
 
-    const int expected = 2+8+2+2+8+2+2+8+2+2+2+8;
+    const int expected = 2 + 8 + 2 + 2 + 8 + 2 + 2 + 8 + 2 + 2 + 2 + 8;
 
     EXPECT_EQ(program[0].val, expected);
 }
@@ -28,9 +27,26 @@ TEST(FixJumpTest, JumpForward2)
 
     fix_jumps(program);
 
-    const int expected = 2+8;
+    const int expected = 2 + 8;
 
     EXPECT_EQ(program[0].val, expected);
+}
+
+TEST(FixJumpTest, JumpForward3)
+{
+    auto program = std::vector({
+        vm_inst{OP_LOAD, 1, 0, 10, 0},
+        vm_inst{OP_READ_CTX, 2, 0, 20, 0},
+        vm_inst{OP_JNEQ, 1, 2, 2, 0},
+        vm_inst{OP_RINGBUF, 0, 0, 0, 0},
+        vm_inst{OP_EXIT, 0, 0, 0, 0},
+    });
+
+    fix_jumps(program);
+
+    const int expected = 2+2+2+8+2;
+
+    EXPECT_EQ(program[2].val, expected);
 }
 
 TEST(FixJumpTest, JumpNone)
@@ -46,7 +62,6 @@ TEST(FixJumpTest, JumpNone)
 
     EXPECT_EQ(program[0].val, expected);
 }
-
 
 TEST(FixJumpTest, JumpBack1)
 {

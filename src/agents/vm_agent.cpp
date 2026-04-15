@@ -35,6 +35,10 @@ std::string_view event_type_to_string(int type)
         return "LSM_BPF_PROGRAM";
     case LSM_OPEN_PROGRAM:
         return "LSM_OPEN_PROGRAM";
+    case KPROBE_FIND_VPID_PROGRAM:
+        return "KPROBE_FIND_VPID_PROGRAM";
+    case KPROBE_PID_TASK_PROGRAM:
+        return "KPROBE_PID_TASK_PROGRAM";
     case VM_ERROR:
         return "VM_ERROR";
     default:
