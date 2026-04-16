@@ -43,20 +43,22 @@
 #define VM_STACK_SIZE 256
 #define VM_NUM_REGS 16 // must be a power of 2!!
 
-#define MAX_PROGRAMS 3
+#define MAX_PROGRAMS 5
 
 // program and event types
 #define VM_ERROR -1
 #define PTRACE_PROGRAM 0
 #define LSM_OPEN_PROGRAM 1
 #define LSM_BPF_PROGRAM 2
+#define KPROBE_FIND_VPID_PROGRAM 3
+#define KPROBE_PID_TASK_PROGRAM 4
 
 // Decoy programs
-#define TRACE_READ_PROGRAM 3
-#define TRACE_WRITE_PROGRAM 4
-#define TRACE_OPEN_PROGRAM 5
-#define INODE_CHECK_PROGRAM 6
-#define TRACE_EXECVE_PROGRAM 7
+#define TRACE_READ_PROGRAM 5
+#define TRACE_WRITE_PROGRAM 6
+#define TRACE_OPEN_PROGRAM 7
+#define INODE_CHECK_PROGRAM 8
+#define TRACE_EXECVE_PROGRAM 9
 
 
 

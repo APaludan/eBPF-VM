@@ -91,6 +91,32 @@ int BPF_PROG(restrict_proc_access, struct file *file)
     return (vm.regs[0] == 0) ? 0 : -EPERM;
 }
 
+SEC("kprobe/find_vpid")
+int BPF_KPROBE(kprobe_find_vpid, int nr)
+{
+    struct vm_state vm = {0};
+
+    vm.type = KPROBE_FIND_VPID_PROGRAM;
+    vm.data = (void *)&nr;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+
+    return (int)vm.regs[0];
+}
+
+SEC("kretprobe/pid_task")
+int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val)
+{
+    struct vm_state vm = {0};
+
+    vm.type = KPROBE_PID_TASK_PROGRAM;
+    vm.data = (void *)return_val;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+
+    return (int)vm.regs[0];
+}
+
 //------------- DECOY HOOKS (Obfuscation) -------
 // These hooks perform dummy operations to confuse potential attackers
 // Decoys create false patterns and misdirection
