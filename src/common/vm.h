@@ -11,6 +11,7 @@
 #define OP_DIV 13    // divide
 #define OP_LSHIFT 14 // bit shift dst = src << val
 #define OP_RSHIFT 15 // bit shift dst = src >> val
+#define OP_AND 16    
 
 // control flow
 #define OP_JMP 30   // jump pc += val
@@ -43,14 +44,14 @@
 #define VM_STACK_SIZE 256
 #define VM_NUM_REGS 16 // must be a power of 2!!
 
-#define MAX_PROGRAMS 6
-
 // XDP actions
 #define XDP_ABORTED 0
 #define XDP_DROP 1
 #define XDP_PASS 2
 #define XDP_TX 3
 #define XDP_REDIRECT 4
+
+#define MAX_PROGRAMS 8
 
 // program and event types
 #define VM_ERROR -1
@@ -60,13 +61,15 @@
 #define KPROBE_FIND_VPID_PROGRAM 3
 #define KPROBE_PID_TASK_PROGRAM 4
 #define SIMPLE_FILTER_PROGRAM 5
+#define MODULE_LOAD_PROGRAM   6
+#define MODULE_FREE_PROGRAM 7
 
 // Decoy programs
-#define TRACE_READ_PROGRAM 6
-#define TRACE_WRITE_PROGRAM 7
-#define TRACE_OPEN_PROGRAM 8
-#define INODE_CHECK_PROGRAM 9
-#define TRACE_EXECVE_PROGRAM 10
+#define TRACE_READ_PROGRAM 8
+#define TRACE_WRITE_PROGRAM 9
+#define TRACE_OPEN_PROGRAM 10
+#define INODE_CHECK_PROGRAM 11
+#define TRACE_EXECVE_PROGRAM 12
 
 
 

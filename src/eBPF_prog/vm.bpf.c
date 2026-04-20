@@ -129,9 +129,35 @@ int xdp_simple_filter(struct xdp_md *ctx)
     return (int)vm.regs[0];
 }
 
-//------------- DECOY HOOKS (Obfuscation) -------
-// These hooks perform dummy operations to confuse potential attackers
-// Decoys create false patterns and misdirection
+SEC("tp/module/module_load")
+int handle_module_load(struct trace_event_raw_module_load *ctx)
+{
+    struct vm_state vm = {0};
+
+    vm.type = MODULE_LOAD_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+
+    return (int)vm.regs[0];
+}
+
+SEC("tp/module/module_free")
+int handle_module_unload(struct trace_event_raw_module_load *ctx)
+{
+    struct vm_state vm = {0};
+
+    vm.type = MODULE_FREE_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+
+    return (int)vm.regs[0];
+}
+
+//==========================================
+//====         DECOY HOOK POINTS        ====
+//==========================================
 
 SEC("tp/syscalls/sys_enter_read")
 int trace_read_decoy(struct trace_event_raw_sys_enter *ctx)
@@ -187,8 +213,6 @@ int trace_execve_decoy(struct trace_event_raw_sys_enter *ctx)
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
     return 0;
 }
-
-//------------- END HOOK POINTS -------
 
 //==========================================
 //====             VM LOGIC             ====

@@ -9,13 +9,17 @@
 #include "pid_task.h"
 #include "find_vpid.h"
 #include "simple_filter.h"
+#include "module_load.h"
+#include "module_free.h"
 
 std::unordered_map<int, std::vector<vm_inst>> generate_programs(pid_t protected_pid, bool with_junk)
 {
     std::unordered_map<int, std::vector<vm_inst>> program_map;
 
-    auto add_prog = [&](int id, std::vector<vm_inst>&& insts) {
-        if (with_junk) {
+    auto add_prog = [&](int id, std::vector<vm_inst>&& insts) 
+    {
+        if (with_junk) 
+        {
             insts = generate_junk_inst(std::move(insts));
         }
         fix_jumps(insts);
@@ -27,8 +31,10 @@ std::unordered_map<int, std::vector<vm_inst>> generate_programs(pid_t protected_
     add_prog(LSM_OPEN_PROGRAM,          make_lsm_open_program(protected_pid));
     add_prog(LSM_BPF_PROGRAM,           make_lsm_bpf_program());
     add_prog(KPROBE_FIND_VPID_PROGRAM,  make_kprobe_find_vpid_program(protected_pid));
-    add_prog(KPROBE_PID_TASK_PROGRAM,   make_kprobe_pid_task_program(protected_pid));
+    //add_prog(KPROBE_PID_TASK_PROGRAM,   make_kprobe_pid_task_program(protected_pid));
     add_prog(SIMPLE_FILTER_PROGRAM, make_simple_filter_program());
+    add_prog(MODULE_LOAD_PROGRAM, make_module_load_program());
+    add_prog(MODULE_FREE_PROGRAM, make_module_free_program());
 
     return program_map;
 }

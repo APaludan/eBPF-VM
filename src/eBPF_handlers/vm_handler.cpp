@@ -16,7 +16,7 @@ int vm_handler::ring_buffer_callback(void *ctx, void *data, size_t data_size)
 {
     if (data_size != sizeof(vm_event))
     {
-        std::cerr << "Size mitch match in event" << std::endl;
+        std::cerr << "ERROR: Size mitch match in event" << std::endl;
         return -1;
     }
 
@@ -53,7 +53,7 @@ int vm_handler::load_and_attach_all(std::unordered_map<int, std::vector<vm_inst>
 {
     if (!on_event)
     {
-        std::cerr << "No on_event callback set" << std::endl;
+        std::cerr << "ERROR: No on_event callback set" << std::endl;
         return -1;
     }
 
@@ -69,13 +69,9 @@ int vm_handler::load_and_attach_all(std::unordered_map<int, std::vector<vm_inst>
 
     if (!rb)
     {
-        std::cerr << "Failed to create ring buffer" << std::endl;
+        std::cerr << "ERROR: Failed to create ring buffer" << std::endl;
         return -1;
     }
-
-    //====================================================================================================================================
-    //======                                                  INSTRUCTION SET START                                                =======
-    //====================================================================================================================================
 
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -92,26 +88,27 @@ int vm_handler::load_and_attach_all(std::unordered_map<int, std::vector<vm_inst>
         populate_map(i.first, i.second, map_fd, key);
     }
 
-    //====================================================================================================================================
-    //======                                                  INSTRUCTION SET ENDS                                                 =======
-    //====================================================================================================================================
-
     if (int err = vm::attach(skel_obj.get()))
     {
-        std::cerr << "Failed to attach: " << err << std::endl;
+        std::cerr << "ERROR: Failed to attach: " << err << std::endl;
         rb.reset();
         return err;
     }
 
     // Attach XDP program to loopback interface
     int ifindex = if_nametoindex("lo");
-    if (ifindex == 0) {
-        std::cerr << "Failed to get ifindex for lo" << std::endl;
+
+    if (ifindex == 0) 
+    {
+        std::cerr << "ERROR: Failed to get ifindex for lo" << std::endl;
         return -1;
     }
+
     xdp_link = bpf_program__attach_xdp(skel_obj->progs.xdp_simple_filter, ifindex);
-    if (!xdp_link) {
-        std::cerr << "Failed to attach XDP program to lo" << std::endl;
+
+    if (!xdp_link) 
+    {
+        std::cerr << "ERROR: Failed to attach XDP program to lo" << std::endl;
         return -1;
     }
 
@@ -155,7 +152,7 @@ void vm_handler::detach_and_unload_all()
     rb.reset();
     skel_obj.reset();
 
-    std::cout << "vm eBPF programs detached and unloaded" << std::endl;
+    std::cout << "SUCCESS: VM eBPF program detached and unloaded" << std::endl;
 }
 
 vm_handler::~vm_handler()
