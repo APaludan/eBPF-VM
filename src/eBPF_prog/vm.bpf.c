@@ -117,6 +117,18 @@ int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val)
     return (int)vm.regs[0];
 }
 
+SEC("xdp")
+int xdp_simple_filter(struct xdp_md *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = SIMPLE_FILTER_PROGRAM;
+    vm.data = (void *)(long)ctx->data;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+
+    return (int)vm.regs[0];
+}
+
 //------------- DECOY HOOKS (Obfuscation) -------
 // These hooks perform dummy operations to confuse potential attackers
 // Decoys create false patterns and misdirection

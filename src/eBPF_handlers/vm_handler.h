@@ -14,6 +14,7 @@ private:
     std::unique_ptr<struct ring_buffer, decltype(&ring_buffer__free)> rb{nullptr, ring_buffer__free};
     std::jthread loop_thread;
     std::function<void(vm_event)> on_event;
+    struct bpf_link *xdp_link = nullptr;
 
 public:
     explicit vm_handler(std::function<void(vm_event)> on_event);
