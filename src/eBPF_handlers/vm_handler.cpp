@@ -8,6 +8,7 @@
 #include <iostream>
 #include <thread>
 #include <random>
+#include <net/if.h>
 #include <vector>
 
 // Ringbuffer callback function, used to call the lampda function when an event arrives
@@ -102,6 +103,18 @@ int vm_handler::load_and_attach_all(std::unordered_map<int, std::vector<vm_inst>
         return err;
     }
 
+    // Attach XDP program to loopback interface
+    int ifindex = if_nametoindex("lo");
+    if (ifindex == 0) {
+        std::cerr << "Failed to get ifindex for lo" << std::endl;
+        return -1;
+    }
+    xdp_link = bpf_program__attach_xdp(skel_obj->progs.xdp_simple_filter, ifindex);
+    if (!xdp_link) {
+        std::cerr << "Failed to attach XDP program to lo" << std::endl;
+        return -1;
+    }
+
     loop_thread = std::jthread(
         [this](std::stop_token st)
         {
@@ -130,6 +143,13 @@ void vm_handler::detach_and_unload_all()
         loop_thread.request_stop();
 
         loop_thread.join();
+    }
+
+    if (skel_obj) {
+        if (xdp_link) {
+            bpf_link__destroy(xdp_link);
+            xdp_link = nullptr;
+        }
     }
 
     rb.reset();
