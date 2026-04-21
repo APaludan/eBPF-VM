@@ -3,12 +3,12 @@
 #include <iostream>
 #include <signal.h>
 
-bool stop = false; // Stop flag variable
+bool stop_flag = false; 
 
 void siginthandler(int param)
 {
     (void)param;
-    stop = true;            
+    stop_flag = true;            
     std::cout << std::endl;
 }
 
@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
 
     signal(SIGINT, siginthandler);
 
-    while (!stop)
+    while (!stop_flag)
     {
         auto maybe_vm_event = agent.get_next_event();
         

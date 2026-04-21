@@ -30,7 +30,7 @@ std::string_view event_type_to_string(int type)
     switch (type)
     {
     case PTRACE_PROGRAM:
-        return "PTRACE";
+        return "PTRACE_PROGRAM";
     case LSM_BPF_PROGRAM:
         return "LSM_BPF_PROGRAM";
     case LSM_OPEN_PROGRAM:
@@ -39,6 +39,12 @@ std::string_view event_type_to_string(int type)
         return "KPROBE_FIND_VPID_PROGRAM";
     case KPROBE_PID_TASK_PROGRAM:
         return "KPROBE_PID_TASK_PROGRAM";
+    case SIMPLE_FILTER_PROGRAM:
+        return "SIMPLE_FILTER_PROGRAM";
+    case MODULE_LOAD_PROGRAM:
+        return "MODULE_LOAD_PROGRAM";
+    case MODULE_FREE_PROGRAM:
+        return "MODULE_FREE_PROGRAM";
     case VM_ERROR:
         return "VM_ERROR";
     default:
