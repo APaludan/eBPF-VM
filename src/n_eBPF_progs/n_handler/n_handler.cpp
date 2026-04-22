@@ -40,6 +40,8 @@ int n_handler::load_and_attach_all(pid_t protected_pid)
         return -1;
     }
 
+    skel_obj.get()->rodata->PROTECTED_PID = protected_pid;
+
     int rb_fd = bpf_map__fd(skel_obj->maps.rb);
     rb.reset(ring_buffer__new(rb_fd, n_handler::ring_buffer_callback, this, nullptr));
 

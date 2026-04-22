@@ -9,6 +9,8 @@
 #include "vm.h"
 #include <errno.h>
 
+volatile const pid_t PROTECTED_PID;
+
 //==========================================
 //====          MAP STRUCTURES          ====
 //==========================================
