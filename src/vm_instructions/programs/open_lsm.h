@@ -30,7 +30,7 @@ std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid)
         vm_inst{OP_READ_CTX, 3, 0, sizeof(void *), 32}, // 14) r3 = *inode, 15
         vm_inst{OP_SUB, 3, 0, 72, 0},                   // 15) r3 = *proc_inode, 16
         vm_inst{OP_READ, 4, 3, sizeof(void *), 0},      // 16) r4 = *struct pid, 17
-        vm_inst{OP_ADD, 4, 0, 144, 0},                  // 17) r4 = *upid[0], 18
+        vm_inst{OP_ADD, 4, 0, 128, 0},                  // 17) r4 = *upid[0], 18
         vm_inst{OP_READ, 5, 4, sizeof(int), 0},         // 18) r5 = target pid, 19
         vm_inst{OP_JNEQ, 0, 8, 3, 0},                   // 19) exit if read failed, means it is probably not procfs anyway idk
         vm_inst{OP_JEQ, 5, 1, 3, 0},                    // 20) jump if (r5 == r1), 21
