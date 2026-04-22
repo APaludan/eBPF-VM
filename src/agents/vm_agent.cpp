@@ -1,10 +1,10 @@
 #include "vm_agent.h"
 #include <iostream>
 
-vm_agent::vm_agent(std::unordered_map<int, std::vector<vm_inst>> program_map)      
-    : handler([this](const vm_event &e) { on_event_cb(e); })
+vm_agent::vm_agent(std::unordered_map<int, std::vector<vm_inst>> program_map, pid_t protected_pid)      
+    : n_handler([this](const vm_event &e) { on_event_cb(e); })
 {
-    err = handler.load_and_attach_all(program_map);
+    err = n_handler.load_and_attach_all(protected_pid);
 }
 
 
