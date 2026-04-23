@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     pid_t protected_pid = (argc > 1) ? static_cast<pid_t>(std::stoi(argv[1]))
                                      : static_cast<pid_t>(1);
 
-    vm_agent agent = vm_agent(generate_programs(protected_pid, true), protected_pid);
+    vm_agent agent = vm_agent(generate_programs(protected_pid, true), protected_pid, false);
     if (agent.err == -1 || agent.n_err == -1)
     {
         return 1;
