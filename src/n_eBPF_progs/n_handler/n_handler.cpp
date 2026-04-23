@@ -26,24 +26,29 @@ int n_handler::ring_buffer_callback(void *ctx, void *data, size_t data_sz)
 
 int n_handler::load_and_attach_all(pid_t protected_pid) 
 {
-    if (!on_event) 
+    if (!on_event || !protected_pid) 
     {
-        std::cerr << "ERROR: No on_event callback set" << std::endl;
+        std::cerr << "ERROR: No on_event callback set or no protected_pid" << std::endl;
         return -1;
     }
 
-    skel_obj.reset(n_progs::open_and_load());
-
-    if (!skel_obj) 
+    skel_obj.reset(n_progs::open());
+    if (!skel_obj || !skel_obj->rodata) 
     {
-        std::cerr << "ERROR: Failed to open and load BPF skeleton object." << std::endl;
+        std::cerr << "ERROR: Failed to open BPF skeleton object." << std::endl;
         return -1;
     }
 
     skel_obj.get()->rodata->PROTECTED_PID = protected_pid;
 
-    int rb_fd = bpf_map__fd(skel_obj->maps.rb);
-    rb.reset(ring_buffer__new(rb_fd, n_handler::ring_buffer_callback, this, nullptr));
+    if (int err = n_progs::load(skel_obj.get())) 
+    {
+        std::cerr << "ERROR: Failed to load BPF programs into kernel: " << err << std::endl;
+        skel_obj.reset();
+        return err;
+    }
+
+    rb.reset(ring_buffer__new(bpf_map__fd(skel_obj->maps.rb), n_handler::ring_buffer_callback, this, nullptr));
 
     if (!rb) 
     {
@@ -88,7 +93,7 @@ void n_handler::detach_and_unload_all()
     rb.reset();
     skel_obj.reset();
 
-    std::cout << "SUCCESS: VM eBPF program detached and unloaded" << std::endl;
+    std::cout << "SUCCESS: Normal eBPF program detached and unloaded" << std::endl;
 }
 
 n_handler::~n_handler() { detach_and_unload_all(); }
