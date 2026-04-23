@@ -11,7 +11,6 @@
 #include <net/if.h>
 #include <vector>
 
-// Ringbuffer callback function, used to call the lampda function when an event arrives
 int vm_handler::ring_buffer_callback(void *ctx, void *data, size_t data_size)
 {
     if (data_size != sizeof(vm_event))
@@ -61,7 +60,7 @@ int vm_handler::load_and_attach_all(std::unordered_map<int, std::vector<vm_inst>
 
     if (!skel_obj)
     {
-        std::cerr << "ERROR: Failed to open BPF skeleton object" << std::endl;
+        std::cerr << "ERROR: Failed to open and load BPF skeleton object" << std::endl;
         return -1;
     }
 
@@ -125,13 +124,11 @@ int vm_handler::load_and_attach_all(std::unordered_map<int, std::vector<vm_inst>
     return 0;
 }
 
-// constructor for vm_handler takes the lambda function as parameter
 vm_handler::vm_handler(std::function<void(vm_event)> cb)
     : on_event(std::move(cb))
 {
 }
 
-// helper function for the deconstructor
 void vm_handler::detach_and_unload_all()
 {
 
@@ -142,8 +139,10 @@ void vm_handler::detach_and_unload_all()
         loop_thread.join();
     }
 
-    if (skel_obj) {
-        if (xdp_link) {
+    if (skel_obj) 
+    {
+        if (xdp_link) 
+        {
             bpf_link__destroy(xdp_link);
             xdp_link = nullptr;
         }

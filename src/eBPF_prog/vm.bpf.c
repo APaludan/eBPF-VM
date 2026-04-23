@@ -42,7 +42,6 @@ struct
 #include "vm_dispatch.h"
 
 static long vm_callback_fn(unsigned int nr_loops, void *ctx);
-static int vm_error(struct vm_state *vm);
 
 //==========================================
 //====            HOOK POINTS           ====
@@ -259,7 +258,10 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     return 0;
 }
 
-//========== ERROR HANDLING ==========
+//==========================================
+//====          ERROR HANDLING          ====
+//==========================================
+
 // Records error state and outputs diagnostic information via ring buffer
 static int vm_error(struct vm_state *vm)
 {

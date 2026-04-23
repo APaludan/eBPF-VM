@@ -3,6 +3,7 @@ add_subdirectory(eBPF_prog)
 add_subdirectory(eBPF_handlers)
 add_subdirectory(agents)
 add_subdirectory(vm_instructions)
+add_subdirectory(n_eBPF_progs)
 
 
 add_executable(${PROJECT_NAME} main.cpp)
