@@ -9,6 +9,7 @@
 #include "vm.h"
 #include <errno.h>
 
+#define PROC_SUPER_MAGIC 0x9fa0
 volatile const pid_t PROTECTED_PID;
 
 //==========================================
@@ -40,52 +41,113 @@ int BPF_PROG(restrict_bpf, int cmd, union bpf_attr *attr, unsigned int size)
 }
 */
 //=============================================================================
-/*
 SEC("tp/syscalls/sys_enter_ptrace")
-int ebpf_vm_interpreter(struct trace_event_raw_sys_enter *ctx)
+int ptrace_entry(struct trace_event_raw_sys_enter *ctx) 
 {
-    struct vm_state vm = {0};
+    pid_t caller_pid = (pid_t)(bpf_get_current_pid_tgid() >> 32);
+    pid_t target;
 
-    vm.type = PTRACE_PROGRAM;
-    vm.data = (void *)ctx;
+    bpf_core_read(&target, sizeof(target), &ctx->args[1]);
 
-    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    if (target != PROTECTED_PID || caller_pid == PROTECTED_PID)
+        return 0;
 
-    return (int)vm.regs[0];
+    struct vm_event *e = bpf_ringbuf_reserve(&rb, sizeof(struct vm_event), 0);
+    if (!e)
+        return 0;
+
+    e->type = PTRACE_PROGRAM;
+    e->caller_pid = caller_pid;
+
+    bpf_get_current_comm(e->caller_name, sizeof(e->caller_name));
+
+    bpf_printk("ptrace called by %s(pid %i)",
+                e->caller_name, e->caller_pid);
+
+    bpf_ringbuf_submit(e, 0);
+
+    return 0;
 }
-*/
+
 //=============================================================================
-/*
 SEC("lsm/file_open")
-int BPF_PROG(restrict_proc_access, struct file *file)
+int BPF_PROG(restrict_proc_access, struct file *file) 
 {
-    struct vm_state vm = {0};
+    pid_t caller_pid = bpf_get_current_pid_tgid() >> 32;
 
-    vm.type = LSM_OPEN_PROGRAM;
-    vm.data = (void *)file;
+    if (caller_pid == PROTECTED_PID)
+        return 0;
 
-    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    unsigned long magic = BPF_CORE_READ(file, f_inode, i_sb, s_magic);
+    if (magic != PROC_SUPER_MAGIC)
+        return 0; // return if not part of procfs
 
-    return 0; // keep for testing
+    // file->f_path.dentry->d_name.name
+    char *name = (char *)BPF_CORE_READ(file, f_path.dentry, d_name.name);
 
-    return (vm.regs[0] == 0) ? 0 : -EPERM;
+    bool is_restricted_file_name = (     bpf_strcmp(name, "maps") == 0 
+                                        || bpf_strcmp(name, "smaps") == 0 
+                                        || bpf_strcmp(name, "mem") == 0);
+
+    if (is_restricted_file_name) 
+    {
+        char *parent_name = (char *)BPF_CORE_READ(file, f_path.dentry, d_parent, d_name.name);
+        char protected_pid_s[16];
+        BPF_SNPRINTF(protected_pid_s, sizeof(protected_pid_s), "%d", PROTECTED_PID);
+
+        bool is_parent_protected_pid = bpf_strcmp(protected_pid_s, parent_name) == 0;
+
+        if (is_parent_protected_pid) 
+        {
+            struct vm_event *event = bpf_ringbuf_reserve(&rb, sizeof(struct vm_event), 0);
+
+            if (!event) 
+            {
+                return -EPERM;
+            }
+
+            event->type = LSM_OPEN_PROGRAM;
+            event->caller_pid = caller_pid;
+
+            bpf_get_current_comm(event->caller_name, sizeof(event->caller_name));
+
+            bpf_printk("open called by %s(pid %i)", 
+                        event->caller_name, event->caller_pid);
+
+            bpf_ringbuf_submit(event, 0);
+            return -EPERM;
+        }
+        return 0;
+  }
+
+  return 0;
 }
-*/
+
 //=============================================================================
-/*
 SEC("kprobe/find_vpid")
-int BPF_KPROBE(kprobe_find_vpid, int nr)
-{
-    struct vm_state vm = {0};
+int BPF_KPROBE(kprobe_find_vpid, int nr) {
+  pid_t looked_up_pid = (pid_t)nr;
 
-    vm.type = KPROBE_FIND_VPID_PROGRAM;
-    vm.data = (void *)&nr;
+  if (looked_up_pid != PROTECTED_PID)
+    return 0;
 
-    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
-    return (int)vm.regs[0];
+  struct vm_event *e = bpf_ringbuf_reserve(&rb, sizeof(struct vm_event), 0);
+
+  if (!e)
+    return 0;
+
+  e->type = KPROBE_FIND_VPID_PROGRAM;
+  e->caller_pid = bpf_get_current_pid_tgid() >> 32;
+
+  bpf_get_current_comm(e->caller_name, sizeof(e->caller_name));
+  bpf_ringbuf_submit(e, 0);
+
+  bpf_printk("vpid lookup by %s, arg: %i", e->caller_name, nr);
+
+  return 0;
 }
-*/
+
 //=============================================================================
 /*
 SEC("kretprobe/pid_task")
@@ -112,19 +174,15 @@ int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val) {
 }
 */
 //=============================================================================
-/*
+
 SEC("xdp")
 int xdp_simple_filter(struct xdp_md *ctx)
 {
-    struct vm_state vm = {0};
-    vm.type = SIMPLE_FILTER_PROGRAM;
-    vm.data = (void *)(long)ctx->data;
 
-    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
-    return (int)vm.regs[0];
+    return 0;
 }
-*/
+
 //=============================================================================
 SEC("tp/module/module_load")
 int handle_module_load(struct trace_event_raw_module_load *ctx) 

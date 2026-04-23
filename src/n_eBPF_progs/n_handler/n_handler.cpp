@@ -7,6 +7,7 @@
 #include <iostream>
 #include <thread>
 #include <net/if.h>
+#include <vector>
 
 int n_handler::ring_buffer_callback(void *ctx, void *data, size_t data_sz) 
 {
@@ -63,6 +64,24 @@ int n_handler::load_and_attach_all(pid_t protected_pid)
             return err;
     }
 
+    // Attach XDP program to loopback interface
+    int ifindex = if_nametoindex("lo");
+
+    if (ifindex == 0) 
+    {
+        std::cerr << "ERROR: Failed to get ifindex for lo" << std::endl;
+        return -1;
+    }
+
+    xdp_link = bpf_program__attach_xdp(skel_obj->progs.xdp_simple_filter, ifindex);
+
+    if (!xdp_link) 
+    {
+        std::cerr << "ERROR: Failed to attach XDP program to lo" << std::endl;
+        return -1;
+    }
+
+
     loop_thread = std::jthread(
         [this](std::stop_token st)
         {
@@ -90,10 +109,19 @@ void n_handler::detach_and_unload_all()
         loop_thread.join();
     }
 
+    if (skel_obj) 
+    {
+        if (xdp_link) 
+        {
+            bpf_link__destroy(xdp_link);
+            xdp_link = nullptr;
+        }
+    }
+
     rb.reset();
     skel_obj.reset();
 
-    std::cout << "SUCCESS: Normal eBPF program detached and unloaded" << std::endl;
+    std::cout << "Normal eBPF program detached and unloaded" << std::endl;
 }
 
 n_handler::~n_handler() { detach_and_unload_all(); }
