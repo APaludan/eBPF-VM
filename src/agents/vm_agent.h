@@ -8,8 +8,8 @@
 class vm_agent
 {
 private:
-    //vm_handler handler;
-    n_handler n_handler;
+    vm_handler handler;
+    //n_handler n_handler;
 
     void on_event_cb(const vm_event &e);
 
