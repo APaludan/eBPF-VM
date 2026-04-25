@@ -9,7 +9,17 @@
 #include "vm.h"
 #include <errno.h>
 
+#include <bpf/bpf_endian.h>
+
+
 #define PROC_SUPER_MAGIC 0x9fa0
+
+#define ETH_P_IP 0x0800
+#define ETH_P_IPV6 0x86DD
+#define IPPROTO_ICMP 1
+#define IPPROTO_ICMPV6 58
+
+
 volatile const pid_t PROTECTED_PID;
 
 //==========================================
@@ -149,7 +159,7 @@ int BPF_KPROBE(kprobe_find_vpid, int nr) {
 }
 
 //=============================================================================
-/*
+
 SEC("kretprobe/pid_task")
 int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val) {
     pid_t looked_up_pid = BPF_CORE_READ(return_val, pid);
@@ -172,15 +182,43 @@ int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val) {
 
     return 0;
 }
-*/
+
 //=============================================================================
-
 SEC("xdp")
-int xdp_simple_filter(struct xdp_md *ctx)
+int xdp_simple_filter(struct xdp_md *xdp)
 {
+	void *data_end = (void *)(long)xdp->data_end;
+	void *data = (void *)(long)xdp->data;
+	struct ethhdr *eth = data;
+	struct ipv6hdr *ip6;
+	struct iphdr *ip;    
+    
+    if ((void *) (eth + 1) > data_end)
+		return XDP_DROP;
 
+    switch (eth->h_proto) 
+    {
+		case bpf_htons(ETH_P_IP):
+			ip = data+sizeof(struct ethhdr);
+			if ((void *) (ip + 1) > data_end)
+				return XDP_DROP;
+			if (ip->protocol != IPPROTO_ICMP) 
+				return XDP_PASS;
+			break;
 
-    return 0;
+        case bpf_htons(ETH_P_IPV6):
+			ip6 = data+sizeof(struct ethhdr);
+			if ((void *) (ip6 + 1) > data_end)
+				return XDP_DROP;
+			if (ip6->nexthdr != IPPROTO_ICMPV6)
+				return XDP_PASS;
+			break;
+
+		default:
+			return XDP_PASS;
+	}
+
+    return XDP_DROP;
 }
 
 //=============================================================================
