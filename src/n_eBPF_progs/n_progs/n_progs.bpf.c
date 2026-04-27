@@ -11,14 +11,12 @@
 
 #include <bpf/bpf_endian.h>
 
-
 #define PROC_SUPER_MAGIC 0x9fa0
 
 #define ETH_P_IP 0x0800
 #define ETH_P_IPV6 0x86DD
 #define IPPROTO_ICMP 1
 #define IPPROTO_ICMPV6 58
-
 
 volatile const pid_t PROTECTED_PID;
 
@@ -52,7 +50,7 @@ int BPF_PROG(restrict_bpf, int cmd, union bpf_attr *attr, unsigned int size)
 */
 //=============================================================================
 SEC("tp/syscalls/sys_enter_ptrace")
-int ptrace_entry(struct trace_event_raw_sys_enter *ctx) 
+int ptrace_entry(struct trace_event_raw_sys_enter *ctx)
 {
     pid_t caller_pid = (pid_t)(bpf_get_current_pid_tgid() >> 32);
     pid_t target;
@@ -72,7 +70,7 @@ int ptrace_entry(struct trace_event_raw_sys_enter *ctx)
     bpf_get_current_comm(e->caller_name, sizeof(e->caller_name));
 
     bpf_printk("ptrace called by %s(pid %i)",
-                e->caller_name, e->caller_pid);
+               e->caller_name, e->caller_pid);
 
     bpf_ringbuf_submit(e, 0);
 
@@ -81,7 +79,7 @@ int ptrace_entry(struct trace_event_raw_sys_enter *ctx)
 
 //=============================================================================
 SEC("lsm/file_open")
-int BPF_PROG(restrict_proc_access, struct file *file) 
+int BPF_PROG(restrict_proc_access, struct file *file)
 {
     pid_t caller_pid = bpf_get_current_pid_tgid() >> 32;
 
@@ -92,81 +90,77 @@ int BPF_PROG(restrict_proc_access, struct file *file)
     if (magic != PROC_SUPER_MAGIC)
         return 0; // return if not part of procfs
 
+    struct inode *f_inode = BPF_CORE_READ(file, f_inode);
+    struct proc_inode *p_inode = container_of(f_inode, struct proc_inode, vfs_inode);
+    struct pid *pid_ptr = BPF_CORE_READ(p_inode, pid);
+    pid_t target_pid = BPF_CORE_READ(pid_ptr, numbers[0].nr);
+
+    if (target_pid != PROTECTED_PID)
+        return 0;
+
     // file->f_path.dentry->d_name.name
     char *name = (char *)BPF_CORE_READ(file, f_path.dentry, d_name.name);
 
-    bool is_restricted_file_name = (     bpf_strcmp(name, "maps") == 0 
-                                        || bpf_strcmp(name, "smaps") == 0 
-                                        || bpf_strcmp(name, "mem") == 0);
+    bool is_restricted_file_name = (bpf_strcmp(name, "maps") == 0 || bpf_strcmp(name, "smaps") == 0 || bpf_strcmp(name, "mem") == 0);
 
-    if (is_restricted_file_name) 
+    if (is_restricted_file_name)
     {
-        char *parent_name = (char *)BPF_CORE_READ(file, f_path.dentry, d_parent, d_name.name);
-        char protected_pid_s[16];
-        BPF_SNPRINTF(protected_pid_s, sizeof(protected_pid_s), "%d", PROTECTED_PID);
+        struct vm_event *event = bpf_ringbuf_reserve(&rb, sizeof(struct vm_event), 0);
 
-        bool is_parent_protected_pid = bpf_strcmp(protected_pid_s, parent_name) == 0;
-
-        if (is_parent_protected_pid) 
+        if (!event)
         {
-            struct vm_event *event = bpf_ringbuf_reserve(&rb, sizeof(struct vm_event), 0);
-
-            if (!event) 
-            {
-                return -EPERM;
-            }
-
-            event->type = LSM_OPEN_PROGRAM;
-            event->caller_pid = caller_pid;
-
-            bpf_get_current_comm(event->caller_name, sizeof(event->caller_name));
-
-            bpf_printk("open called by %s(pid %i)", 
-                        event->caller_name, event->caller_pid);
-
-            bpf_ringbuf_submit(event, 0);
             return -EPERM;
         }
-        return 0;
-  }
 
-  return 0;
+        event->type = LSM_OPEN_PROGRAM;
+        event->caller_pid = caller_pid;
+
+        bpf_get_current_comm(event->caller_name, sizeof(event->caller_name));
+
+        bpf_printk("open called by %s(pid %i)",
+                   event->caller_name, event->caller_pid);
+
+        bpf_ringbuf_submit(event, 0);
+        return -EPERM;
+    }
+
+    return 0;
 }
 
 //=============================================================================
 SEC("kprobe/find_vpid")
-int BPF_KPROBE(kprobe_find_vpid, int nr) {
-  pid_t looked_up_pid = (pid_t)nr;
+int BPF_KPROBE(kprobe_find_vpid, int nr)
+{
+    pid_t looked_up_pid = (pid_t)nr;
 
-  if (looked_up_pid != PROTECTED_PID)
+    if (looked_up_pid != PROTECTED_PID)
+        return 0;
+
+    struct vm_event *e = bpf_ringbuf_reserve(&rb, sizeof(struct vm_event), 0);
+
+    if (!e)
+        return 0;
+
+    e->type = KPROBE_FIND_VPID_PROGRAM;
+    e->caller_pid = bpf_get_current_pid_tgid() >> 32;
+
+    bpf_get_current_comm(e->caller_name, sizeof(e->caller_name));
+    bpf_ringbuf_submit(e, 0);
+
+    bpf_printk("vpid lookup by %s, arg: %i", e->caller_name, nr);
+
     return 0;
-
-
-  struct vm_event *e = bpf_ringbuf_reserve(&rb, sizeof(struct vm_event), 0);
-
-  if (!e)
-    return 0;
-
-  e->type = KPROBE_FIND_VPID_PROGRAM;
-  e->caller_pid = bpf_get_current_pid_tgid() >> 32;
-
-  bpf_get_current_comm(e->caller_name, sizeof(e->caller_name));
-  bpf_ringbuf_submit(e, 0);
-
-  bpf_printk("vpid lookup by %s, arg: %i", e->caller_name, nr);
-
-  return 0;
 }
 
 //=============================================================================
 
 SEC("kretprobe/pid_task")
-int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val) {
+int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val)
+{
     pid_t looked_up_pid = BPF_CORE_READ(return_val, pid);
 
     if (looked_up_pid != PROTECTED_PID)
         return 0;
-
 
     struct vm_event *e = bpf_ringbuf_reserve(&rb, sizeof(struct vm_event), 0);
     if (!e)
@@ -178,7 +172,7 @@ int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val) {
     bpf_get_current_comm(e->caller_name, sizeof(e->caller_name));
     bpf_ringbuf_submit(e, 0);
 
-    bpf_printk("task lookup by %s, arg: %i", e->caller_name, looked_up_pid);
+    // bpf_printk("task lookup by %s, arg: %i", e->caller_name, looked_up_pid);
 
     return 0;
 }
@@ -196,7 +190,10 @@ int xdp_simple_filter(struct xdp_md *ctx)
     if ((void *) (eth + 1) > data_end)
 		return XDP_DROP;
 
-    switch (eth->h_proto) 
+    if ((void *)(eth + 1) > data_end)
+        return XDP_DROP;
+
+    switch (eth->h_proto)
     {
         // bpf_htons convert host byte order to network byte order (in this case 0x0800 to 0x0008)
 		case bpf_htons(ETH_P_IP):
@@ -207,24 +204,24 @@ int xdp_simple_filter(struct xdp_md *ctx)
 				return XDP_PASS;
 			break;
 
-        case bpf_htons(ETH_P_IPV6):
-			ip6 = data+sizeof(struct ethhdr);
-			if ((void *) (ip6 + 1) > data_end)
-				return XDP_DROP;
-			if (ip6->nexthdr != IPPROTO_ICMPV6)
-				return XDP_PASS;
-			break;
+    case bpf_htons(ETH_P_IPV6):
+        ip6 = data + sizeof(struct ethhdr);
+        if ((void *)(ip6 + 1) > data_end)
+            return XDP_DROP;
+        if (ip6->nexthdr != IPPROTO_ICMPV6)
+            return XDP_PASS;
+        break;
 
-		default:
-			return XDP_PASS;
-	}
+    default:
+        return XDP_PASS;
+    }
 
     return XDP_DROP;
 }
 
 //=============================================================================
 SEC("tp/module/module_load")
-int handle_module_load(struct trace_event_raw_module_load *ctx) 
+int handle_module_load(struct trace_event_raw_module_load *ctx)
 {
     struct vm_event *e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
     if (!e)
@@ -241,10 +238,9 @@ int handle_module_load(struct trace_event_raw_module_load *ctx)
     return 0;
 }
 
-
 //=============================================================================
 SEC("tp/module/module_free")
-int handle_module_unload(struct trace_event_raw_module_load *ctx) 
+int handle_module_unload(struct trace_event_raw_module_load *ctx)
 {
     struct vm_event *e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
     if (!e)
@@ -260,6 +256,5 @@ int handle_module_unload(struct trace_event_raw_module_load *ctx)
     bpf_ringbuf_submit(e, 0);
     return 0;
 }
-
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
