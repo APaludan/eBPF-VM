@@ -124,8 +124,8 @@ int xdp_simple_filter(struct xdp_md *ctx)
     vm.data = (void *)(long)ctx->data;
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
-
-    return (int)vm.regs[0];
+    // return vm.regs[0] to block icmp v4 and v6
+    return 2;
 }
 
 SEC("tp/module/module_load")
