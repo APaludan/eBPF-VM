@@ -151,7 +151,7 @@ void vm_handler::detach_and_unload_all()
     rb.reset();
     skel_obj.reset();
 
-    std::cout << "SUCCESS: VM eBPF program detached and unloaded" << std::endl;
+    std::cout << "VM eBPF program detached and unloaded" << std::endl;
 }
 
 vm_handler::~vm_handler()
