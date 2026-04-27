@@ -185,10 +185,10 @@ int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val) {
 
 //=============================================================================
 SEC("xdp")
-int xdp_simple_filter(struct xdp_md *xdp)
+int xdp_simple_filter(struct xdp_md *ctx)
 {
-	void *data_end = (void *)(long)xdp->data_end;
-	void *data = (void *)(long)xdp->data;
+	void *data_end = (void *)(long)ctx->data_end;
+	void *data = (void *)(long)ctx->data;
 	struct ethhdr *eth = data;
 	struct ipv6hdr *ip6;
 	struct iphdr *ip;    
@@ -198,6 +198,7 @@ int xdp_simple_filter(struct xdp_md *xdp)
 
     switch (eth->h_proto) 
     {
+        // bpf_htons convert host byte order to network byte order (in this case 0x0800 to 0x0008)
 		case bpf_htons(ETH_P_IP):
 			ip = data+sizeof(struct ethhdr);
 			if ((void *) (ip + 1) > data_end)
