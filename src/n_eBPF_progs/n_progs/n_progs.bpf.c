@@ -79,16 +79,20 @@ int ptrace_entry(struct trace_event_raw_sys_enter *ctx)
 
 //=============================================================================
 SEC("lsm/file_open")
-int BPF_PROG(restrict_proc_access, struct file *file)
+int BPF_PROG(n_restrict_proc_access, struct file *file)
 {
     pid_t caller_pid = bpf_get_current_pid_tgid() >> 32;
 
     if (caller_pid == PROTECTED_PID)
+    {
         return 0;
+    }
 
     unsigned long magic = BPF_CORE_READ(file, f_inode, i_sb, s_magic);
     if (magic != PROC_SUPER_MAGIC)
+    {
         return 0; // return if not part of procfs
+    }
 
     struct inode *f_inode = BPF_CORE_READ(file, f_inode);
     struct proc_inode *p_inode = container_of(f_inode, struct proc_inode, vfs_inode);
@@ -96,7 +100,9 @@ int BPF_PROG(restrict_proc_access, struct file *file)
     pid_t target_pid = BPF_CORE_READ(pid_ptr, numbers[0].nr);
 
     if (target_pid != PROTECTED_PID)
+    {
         return 0;
+    }
 
     // file->f_path.dentry->d_name.name
     char *name = (char *)BPF_CORE_READ(file, f_path.dentry, d_name.name);
@@ -117,10 +123,9 @@ int BPF_PROG(restrict_proc_access, struct file *file)
 
         bpf_get_current_comm(event->caller_name, sizeof(event->caller_name));
 
-        bpf_printk("open called by %s(pid %i)",
-                   event->caller_name, event->caller_pid);
 
         bpf_ringbuf_submit(event, 0);
+        return 0;
         return -EPERM;
     }
 
@@ -181,28 +186,28 @@ int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val)
 SEC("xdp")
 int xdp_simple_filter(struct xdp_md *ctx)
 {
-	void *data_end = (void *)(long)ctx->data_end;
-	void *data = (void *)(long)ctx->data;
-	struct ethhdr *eth = data;
-	struct ipv6hdr *ip6;
-	struct iphdr *ip;    
-    
-    if ((void *) (eth + 1) > data_end)
-		return XDP_DROP;
+    void *data_end = (void *)(long)ctx->data_end;
+    void *data = (void *)(long)ctx->data;
+    struct ethhdr *eth = data;
+    struct ipv6hdr *ip6;
+    struct iphdr *ip;
+
+    if ((void *)(eth + 1) > data_end)
+        return XDP_DROP;
 
     if ((void *)(eth + 1) > data_end)
         return XDP_DROP;
 
     switch (eth->h_proto)
     {
-        // bpf_htons convert host byte order to network byte order (in this case 0x0800 to 0x0008)
-		case bpf_htons(ETH_P_IP):
-			ip = data+sizeof(struct ethhdr);
-			if ((void *) (ip + 1) > data_end)
-				return XDP_DROP;
-			if (ip->protocol != IPPROTO_ICMP) 
-				return XDP_PASS;
-			break;
+    // bpf_htons convert host byte order to network byte order (in this case 0x0800 to 0x0008)
+    case bpf_htons(ETH_P_IP):
+        ip = data + sizeof(struct ethhdr);
+        if ((void *)(ip + 1) > data_end)
+            return XDP_DROP;
+        if (ip->protocol != IPPROTO_ICMP)
+            return XDP_PASS;
+        break;
 
     case bpf_htons(ETH_P_IPV6):
         ip6 = data + sizeof(struct ethhdr);

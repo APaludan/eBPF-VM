@@ -49,6 +49,24 @@ TEST(FixJumpTest, JumpForward3)
     EXPECT_EQ(program[2].val, expected);
 }
 
+TEST(FixJumpTest, JumpForward4)
+{
+    auto program = std::vector({
+        vm_inst{OP_JMP, 0, 0, 4, 0},
+        vm_inst{OP_RINGBUF, 0, 0, 0, 0},
+        vm_inst{OP_PRINTS, 0, 3, 0, 0},
+        vm_inst{OP_LOAD, 0, 0, -EPERM, 0},
+        vm_inst{OP_EXIT, 0, 0, 0, 0},
+        vm_inst{OP_PRINTI, 0, 0, 0, 0},
+    });
+
+    fix_jumps(program);
+
+    const int expected = 2+8+2+2+2+2+2+8;
+
+    EXPECT_EQ(program[0].val, expected);
+}
+
 TEST(FixJumpTest, JumpNone)
 {
     auto program = std::vector({

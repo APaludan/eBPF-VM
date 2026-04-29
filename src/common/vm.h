@@ -97,9 +97,7 @@ struct vm_state
     unsigned int pc;
     char stack[VM_STACK_SIZE];
     unsigned short sp;
-    void *map;
     void *data;
-    void *data_end;
     int type;
 };
 

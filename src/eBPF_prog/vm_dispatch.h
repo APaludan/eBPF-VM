@@ -198,12 +198,12 @@ static inline long vm_exec_io_ops(struct vm_inst *inst, struct vm_state *vm)
                 e->type = vm->type;
                 bpf_get_current_comm(e->caller_name, sizeof(e->caller_name));
 
-                for (int i = 0; i < VM_NUM_REGS; i++)
-                {
-                    e->reg_values[i] = vm->regs[i];
-                }
+                // for (int i = 0; i < VM_NUM_REGS; i++)
+                // {
+                //     e->reg_values[i] = vm->regs[i];
+                // }
 
-                e->pc = vm->pc;
+                // e->pc = vm->pc;
                 bpf_ringbuf_submit(e, 0);
             }
             break;

@@ -76,7 +76,7 @@ int ebpf_vm_interpreter(struct trace_event_raw_sys_enter *ctx)
 }
 
 SEC("lsm/file_open")
-int BPF_PROG(restrict_proc_access, struct file *file)
+int BPF_PROG(vm_restrict_proc_access, struct file *file)
 {
     struct vm_state vm = {0};
 
