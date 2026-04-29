@@ -107,8 +107,7 @@ int vm_handler::load_and_attach_all(std::unordered_map<int, std::vector<vm_inst>
 
     if (!xdp_link) 
     {
-        std::cerr << "ERROR: Failed to attach XDP program to lo" << std::endl;
-        return -1;
+        std::cerr << "ERROR: Failed to attach VM XDP program to lo" << std::endl;
     }
 
     loop_thread = std::jthread(

@@ -77,8 +77,7 @@ int n_handler::load_and_attach_all(pid_t protected_pid)
 
     if (!xdp_link) 
     {
-        std::cerr << "ERROR: Failed to attach XDP program to lo" << std::endl;
-        return -1;
+        std::cerr << "ERROR: Failed to attach normal XDP program to lo" << std::endl;
     }
 
 

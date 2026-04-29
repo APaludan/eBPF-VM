@@ -103,18 +103,18 @@ int BPF_KPROBE(kprobe_find_vpid, int nr)
     return (int)vm.regs[0];
 }
 
-SEC("kretprobe/pid_task")
-int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val)
-{
-    struct vm_state vm = {0};
+// SEC("kretprobe/pid_task")
+// int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val)
+// {
+//     struct vm_state vm = {0};
 
-    vm.type = KPROBE_PID_TASK_PROGRAM;
-    vm.data = (void *)return_val;
+//     vm.type = KPROBE_PID_TASK_PROGRAM;
+//     vm.data = (void *)return_val;
 
-    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+//     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
-    return (int)vm.regs[0];
-}
+//     return (int)vm.regs[0];
+// }
 
 SEC("xdp")
 int xdp_simple_filter(struct xdp_md *ctx)

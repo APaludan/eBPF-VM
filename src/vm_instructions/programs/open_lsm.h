@@ -49,7 +49,8 @@ std::vector<vm_inst> make_lsm_open_program(pid_t protected_pid)
         vm_inst{OP_JEQ, 5, 4, 4, 0},                        // 30) 2
         vm_inst{OP_LOAD, 4, 0, (long long)mem, 0},          // 31) 1
         vm_inst{OP_JEQ, 5, 4, 2, 0},                        // 32) 2
-        vm_inst{OP_JMP, 0, 0, 4, 0},                        // 33) jump over ringbuf submit if not sus
+        vm_inst{OP_JMP, 0, 0, 5, 0},                        // 33) jump over ringbuf submit if not sus
+        vm_inst{OP_PRINTS, 0, 3, 0, 0},
         vm_inst{OP_RINGBUF, 0, 0, 0, 0},                    //
         vm_inst{OP_LOAD, 0, 0, -EPERM, 0},                 // 35) set return val to -EPERM
         vm_inst{OP_EXIT, 0, 0, 0, 0},

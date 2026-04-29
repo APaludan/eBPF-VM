@@ -159,28 +159,28 @@ int BPF_KPROBE(kprobe_find_vpid, int nr)
 
 //=============================================================================
 
-SEC("kretprobe/pid_task")
-int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val)
-{
-    pid_t looked_up_pid = BPF_CORE_READ(return_val, pid);
+// SEC("kretprobe/pid_task")
+// int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val)
+// {
+//     pid_t looked_up_pid = BPF_CORE_READ(return_val, pid);
 
-    if (looked_up_pid != PROTECTED_PID)
-        return 0;
+//     if (looked_up_pid != PROTECTED_PID)
+//         return 0;
 
-    struct vm_event *e = bpf_ringbuf_reserve(&rb, sizeof(struct vm_event), 0);
-    if (!e)
-        return 0;
+//     struct vm_event *e = bpf_ringbuf_reserve(&rb, sizeof(struct vm_event), 0);
+//     if (!e)
+//         return 0;
 
-    e->type = KPROBE_PID_TASK_PROGRAM;
-    e->caller_pid = bpf_get_current_pid_tgid() >> 32;
+//     e->type = KPROBE_PID_TASK_PROGRAM;
+//     e->caller_pid = bpf_get_current_pid_tgid() >> 32;
 
-    bpf_get_current_comm(e->caller_name, sizeof(e->caller_name));
-    bpf_ringbuf_submit(e, 0);
+//     bpf_get_current_comm(e->caller_name, sizeof(e->caller_name));
+//     bpf_ringbuf_submit(e, 0);
 
-    // bpf_printk("task lookup by %s, arg: %i", e->caller_name, looked_up_pid);
+//     // bpf_printk("task lookup by %s, arg: %i", e->caller_name, looked_up_pid);
 
-    return 0;
-}
+//     return 0;
+// }
 
 //=============================================================================
 SEC("xdp")
