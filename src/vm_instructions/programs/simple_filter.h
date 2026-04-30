@@ -51,7 +51,7 @@ std::vector<vm_inst> make_simple_filter_program()
 
         //============================ case 2 ============================
         // case 2 (not ipv6): bpf_htons(ETH_P_IPV6) = r3 != r1 -> pass
-        vm_inst{OP_JNEQ, 1, 2, 8, 0},
+        vm_inst{OP_JNEQ, 1, 3, 8, 0},
 
         // r4 = ip6->nexthdr
         vm_inst{OP_READ_CTX, 4, 0, 1, 20},
