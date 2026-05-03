@@ -84,40 +84,67 @@ bool is_jmp_op(unsigned short op)
 }
 
 // TODO: Still neeed to tage højde for MAX_INSTRUCTION (define length of what length the instr set should be) + might be a better way then just skip next offset of instructions for each jump op
-std::vector<vm_inst> generate_junk_inst(std::vector<vm_inst> inst_set) 
+std::vector<vm_inst> generate_junk_inst(std::vector<vm_inst> inst_set, int number_of_inst) 
 {
+    if (number_of_inst == 0)
+        return inst_set;
 
-    std::vector<vm_inst> junk_injected_inst;
+    std::vector<vm_inst> junk_inst;
     size_t i = 0;
-    
-    while (i < inst_set.size()) 
+
+    while (i < inst_set.size() && junk_inst.size() < (size_t)number_of_inst) 
     {
-        junk_injected_inst.push_back(inst_set[i]);
+        junk_inst.push_back(inst_set[i]);
 
         if (is_jmp_op(inst_set[i].op)) 
         {
             size_t target_index = i + inst_set[i].val;
 
-            for (size_t j = i + 1; j <= target_index && j < inst_set.size(); ++j) 
+            for (size_t j = i + 1; 
+                 j <= target_index && j < inst_set.size() && junk_inst.size() < (size_t)number_of_inst; 
+                 ++j) 
             {
-                junk_injected_inst.push_back(inst_set[j]);
+                junk_inst.push_back(inst_set[j]);
             }
 
-            i = target_index; 
-
-        } else 
+            i = target_index;
+        } 
+        else 
         {
-            if (random_int(0, 100) <= 100) 
+            if (random_int(0, 100) < 30) 
             {
                 auto junk = random_junk();
-                junk_injected_inst.insert(junk_injected_inst.end(), junk.begin(), junk.end());
+
+                for (const auto& inst : junk) 
+                {
+                    if (junk_inst.size() >= (size_t)number_of_inst)
+                        break;
+
+                    junk_inst.push_back(inst);
+                }
             }
         }
 
         ++i;
     }
-    
-    return junk_injected_inst;
+
+    // Tilføjere bere på enden af junk_injecte
+    while (junk_inst.size() < (size_t)number_of_inst) 
+    {
+        auto junk = random_junk();
+
+        for (const auto& inst : junk) 
+        {
+            if (junk_inst.size() >= (size_t)number_of_inst)
+                break;
+
+            junk_inst.push_back(inst);
+        }
+    }
+
+    junk_inst.resize(number_of_inst);
+
+    return junk_inst;
 }
 
 //==============================================
@@ -142,6 +169,11 @@ void print_program_map_to_csv( const std::unordered_map<int, std::vector<vm_inst
             case PTRACE_PROGRAM: return "PTRACE_PROGRAM";
             case LSM_OPEN_PROGRAM: return "LSM_OPEN_PROGRAM";
             case LSM_BPF_PROGRAM: return "LSM_BPF_PROGRAM";
+            case KPROBE_FIND_VPID_PROGRAM: return "KPROBE_FIND_VPID_PROGRAM";
+            case KPROBE_PID_TASK_PROGRAM: return "KPROBE_PID_TASK_PROGRAM";
+            case SIMPLE_FILTER_PROGRAM: return "SIMPLE_FILTER_PROGRAM";
+            case MODULE_LOAD_PROGRAM: return "MODULE_LOAD_PROGRAM";
+            case MODULE_FREE_PROGRAM: return "MODULE_FREE_PROGRAM";
             default: return "UNKNOWN_PROGRAM";
         }
     };
