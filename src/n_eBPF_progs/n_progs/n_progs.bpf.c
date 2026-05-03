@@ -88,16 +88,20 @@ int BPF_PROG(n_restrict_proc_access, struct file *file)
         return 0;
     }
 
-    unsigned long magic = BPF_CORE_READ(file, f_inode, i_sb, s_magic);
+    unsigned long magic;
+    bpf_probe_read_kernel(&magic, sizeof(magic), &file->f_inode->i_sb->s_magic);
     if (magic != PROC_SUPER_MAGIC)
     {
         return 0; // return if not part of procfs
     }
 
-    struct inode *f_inode = BPF_CORE_READ(file, f_inode);
+    struct inode *f_inode;;
+    bpf_probe_read_kernel(&f_inode, sizeof(f_inode), &file->f_inode);
     struct proc_inode *p_inode = container_of(f_inode, struct proc_inode, vfs_inode);
-    struct pid *pid_ptr = BPF_CORE_READ(p_inode, pid);
-    pid_t target_pid = BPF_CORE_READ(pid_ptr, numbers[0].nr);
+    struct pid *pid_ptr;
+    bpf_probe_read_kernel(&pid_ptr, sizeof(pid_ptr), &p_inode->pid);
+    pid_t target_pid;
+    bpf_probe_read_kernel(&target_pid, sizeof(target_pid), &pid_ptr->numbers[0].nr);
 
     if (target_pid != PROTECTED_PID)
     {
@@ -105,7 +109,8 @@ int BPF_PROG(n_restrict_proc_access, struct file *file)
     }
 
     // file->f_path.dentry->d_name.name
-    char *name = (char *)BPF_CORE_READ(file, f_path.dentry, d_name.name);
+    char *name;
+    bpf_probe_read_kernel(&name, sizeof(name), &file->f_path.dentry->d_name.name);
 
     bool is_restricted_file_name = (bpf_strcmp(name, "maps") == 0 || bpf_strcmp(name, "smaps") == 0 || bpf_strcmp(name, "mem") == 0);
 
@@ -120,6 +125,7 @@ int BPF_PROG(n_restrict_proc_access, struct file *file)
 
         event->type = LSM_OPEN_PROGRAM;
         event->caller_pid = caller_pid;
+        event->pc = 99;
 
         bpf_get_current_comm(event->caller_name, sizeof(event->caller_name));
 
@@ -134,7 +140,7 @@ int BPF_PROG(n_restrict_proc_access, struct file *file)
 
 //=============================================================================
 SEC("kprobe/find_vpid")
-int BPF_KPROBE(kprobe_find_vpid, int nr)
+int BPF_KPROBE(n_kprobe_find_vpid, int nr)
 {
     pid_t looked_up_pid = (pid_t)nr;
 
@@ -160,7 +166,7 @@ int BPF_KPROBE(kprobe_find_vpid, int nr)
 //=============================================================================
 
 // SEC("kretprobe/pid_task")
-// int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val)
+// int BPF_KRETPROBE(n_kprobe_pid_task_exit, struct task_struct *return_val)
 // {
 //     pid_t looked_up_pid = BPF_CORE_READ(return_val, pid);
 

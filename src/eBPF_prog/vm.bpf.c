@@ -91,7 +91,7 @@ int BPF_PROG(vm_restrict_proc_access, struct file *file)
 }
 
 SEC("kprobe/find_vpid")
-int BPF_KPROBE(kprobe_find_vpid, int nr)
+int BPF_KPROBE(vm_kprobe_find_vpid, int nr)
 {
     struct vm_state vm = {0};
 
@@ -104,7 +104,7 @@ int BPF_KPROBE(kprobe_find_vpid, int nr)
 }
 
 // SEC("kretprobe/pid_task")
-// int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val)
+// int BPF_KRETPROBE(vm_kprobe_pid_task_exit, struct task_struct *return_val)
 // {
 //     struct vm_state vm = {0};
 
