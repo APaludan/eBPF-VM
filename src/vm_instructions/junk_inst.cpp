@@ -93,10 +93,14 @@ std::vector<vm_inst> generate_junk_inst(std::vector<vm_inst> inst_set)
     while (i < inst_set.size()) 
     {
         junk_injected_inst.push_back(inst_set[i]);
-
+        
         if (is_jmp_op(inst_set[i].op)) 
         {
-            size_t target_index = i + inst_set[i].val;
+            if ((int)inst_set[i].val < 0) {
+                i++;
+                continue;
+            }
+            size_t target_index = i + inst_set[i].val + 1;
 
             for (size_t j = i + 1; j <= target_index && j < inst_set.size(); ++j) 
             {

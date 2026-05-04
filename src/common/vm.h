@@ -99,6 +99,7 @@ struct vm_state
     unsigned short sp;
     void *data;
     int type;
+    int key;
 };
 
 static inline int next_key(int *current)

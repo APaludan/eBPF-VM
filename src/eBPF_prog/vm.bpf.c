@@ -34,7 +34,7 @@ struct
 struct
 {
     __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(max_entries, VM_MAX_PROGRAM_SIZE * MAX_PROGRAMS);
+    __uint(max_entries, VM_MAX_PROGRAM_SIZE *MAX_PROGRAMS);
     __type(key, unsigned int);
     __type(value, uint8_t);
 } programs SEC(".maps");
@@ -78,12 +78,21 @@ int ebpf_vm_interpreter(struct trace_event_raw_sys_enter *ctx)
 SEC("lsm/file_open")
 int BPF_PROG(vm_restrict_proc_access, struct file *file)
 {
+    u64 start, end;
+    start = bpf_ktime_get_boot_ns();
+
     struct vm_state vm = {0};
 
     vm.type = LSM_OPEN_PROGRAM;
     vm.data = (void *)file;
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+
+    if ((int)vm.regs[0] == -EPERM)
+    {
+        end = bpf_ktime_get_boot_ns();
+        bpf_printk("vm: %llu", end - start);
+    }
 
     return 0; // keep for testing
 
@@ -224,6 +233,15 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     struct vm_state *vm = (struct vm_state *)ctx;
     struct vm_inst inst = {0};
 
+    if (vm->key == 0)
+    {
+        unsigned int key_idx = 0;
+        int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+        if (key_ptr == NULL)
+            return 1;
+        vm->key = *key_ptr;
+    }
+
     int size = get_next_inst(&inst, vm);
     if (size == -1)
         return 1;
@@ -329,18 +347,15 @@ int get_next_inst(struct vm_inst *inst, struct vm_state *vm)
     if (!inst || !vm)
         return -1;
 
-    unsigned int key_idx = 0;
-    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
-    if (key_ptr == NULL)
-        return -1;
-    int key = *key_ptr + vm->pc;
 
     int size = 0;
     unsigned int program_index_pc = vm->type * VM_MAX_PROGRAM_SIZE + vm->pc;
-
+        
     if (!get_uint16(&program_index_pc, (uint16_t *)&inst->op))
         return -1;
-
+        
+    int key = vm->key + vm->pc;
+    
     unsigned short decrypted_op = peek_op(inst, key);
     size += sizeof(inst->op);
     if (have_dst(decrypted_op))

@@ -81,6 +81,8 @@ int ptrace_entry(struct trace_event_raw_sys_enter *ctx)
 SEC("lsm/file_open")
 int BPF_PROG(n_restrict_proc_access, struct file *file)
 {
+    u64 start, end;
+    start = bpf_ktime_get_boot_ns();
     pid_t caller_pid = bpf_get_current_pid_tgid() >> 32;
 
     if (caller_pid == PROTECTED_PID)
@@ -131,10 +133,11 @@ int BPF_PROG(n_restrict_proc_access, struct file *file)
 
 
         bpf_ringbuf_submit(event, 0);
+        end = bpf_ktime_get_boot_ns();
+        bpf_printk("normal: %llu", end - start);
         return 0;
         return -EPERM;
     }
-
     return 0;
 }
 

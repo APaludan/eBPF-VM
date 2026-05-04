@@ -5,3 +5,4 @@
 std::unordered_map<int, std::vector<vm_inst>> generate_programs(pid_t protected_pid, bool with_junk);
 std::vector<uint8_t> serialize_inst(const vm_inst inst, int key);
 void fix_jumps(std::vector<vm_inst> &program);
+size_t inst_serialized_size(const vm_inst &inst);

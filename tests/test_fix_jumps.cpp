@@ -44,7 +44,7 @@ TEST(FixJumpTest, JumpForward3)
 
     fix_jumps(program);
 
-    const int expected = 2+2+2+8+2;
+    const int expected = 2 + 2 + 2 + 8 + 2;
 
     EXPECT_EQ(program[2].val, expected);
 }
@@ -62,7 +62,41 @@ TEST(FixJumpTest, JumpForward4)
 
     fix_jumps(program);
 
-    const int expected = 2+8+2+2+2+2+2+8;
+    const int expected = 2 + 8 + 2 + 2 + 2 + 2 + 2 + 8;
+
+    EXPECT_EQ(program[0].val, expected);
+}
+
+TEST(FixJumpTest, JumpForward5)
+{
+    std::vector<vm_inst> program({
+        vm_inst{OP_JMP, 0, 0, 5, 0},       // 2 + 8
+        vm_inst{OP_PRINTS, 0, 3, 0, 0},    // 2 + 2
+        vm_inst{OP_RINGBUF, 0, 0, 0, 0},   // 2
+        vm_inst{OP_LOAD, 0, 0, -EPERM, 0}, // 2 + 2 + 8
+        vm_inst{OP_EXIT, 0, 0, 0, 0},      // 2
+        vm_inst{OP_LOAD, 0, 0, 0, 0},
+        vm_inst{OP_EXIT, 0, 0, 0, 0},
+    });
+
+    auto size = inst_serialized_size(program[0]);
+    EXPECT_EQ(size, 10);
+
+    size = inst_serialized_size(program[1]);
+    EXPECT_EQ(size, 4);
+
+    size = inst_serialized_size(program[2]);
+    EXPECT_EQ(size, 2);
+
+    size = inst_serialized_size(program[3]);
+    EXPECT_EQ(size, 12);
+
+    size = inst_serialized_size(program[4]);
+    EXPECT_EQ(size, 2);
+
+    fix_jumps(program);
+
+    const int expected = 2 + 8 + 2 + 2 + 2 + 2 + 2 + 8 + 2;
 
     EXPECT_EQ(program[0].val, expected);
 }
