@@ -49,32 +49,55 @@ int BPF_PROG(restrict_bpf, int cmd, union bpf_attr *attr, unsigned int size)
 }
 */
 //=============================================================================
+// SEC("tp/syscalls/sys_enter_ptrace")
+// int ptrace_entry(struct trace_event_raw_sys_enter *ctx)
+// {
+//     pid_t caller_pid = (pid_t)(bpf_get_current_pid_tgid() >> 32);
+//     pid_t target;
+
+//     bpf_core_read(&target, sizeof(target), &ctx->args[1]);
+
+//     if (target != PROTECTED_PID || caller_pid == PROTECTED_PID)
+//         return 0;
+
+//     struct vm_event *e = bpf_ringbuf_reserve(&rb, sizeof(struct vm_event), 0);
+//     if (!e)
+//         return 0;
+
+//     e->type = PTRACE_PROGRAM;
+//     e->caller_pid = caller_pid;
+
+//     bpf_get_current_comm(e->caller_name, sizeof(e->caller_name));
+
+//     bpf_ringbuf_submit(e, 0);
+
+//     return 0;
+// }
+
 SEC("tp/syscalls/sys_enter_ptrace")
 int ptrace_entry(struct trace_event_raw_sys_enter *ctx)
 {
-    pid_t caller_pid = (pid_t)(bpf_get_current_pid_tgid() >> 32);
-    pid_t target;
+    u64 start, end;
+    start = bpf_ktime_get_boot_ns();
 
-    bpf_core_read(&target, sizeof(target), &ctx->args[1]);
+    volatile int vol_n = 93;
+    int n = vol_n;
 
-    if (target != PROTECTED_PID || caller_pid == PROTECTED_PID)
-        return 0;
+    unsigned long long first = 0;
+    unsigned long long second = 1;
+    unsigned long long next = 0;
 
-    struct vm_event *e = bpf_ringbuf_reserve(&rb, sizeof(struct vm_event), 0);
-    if (!e)
-        return 0;
+    if (n > 1000) return 0;
 
-    e->type = PTRACE_PROGRAM;
-    e->caller_pid = caller_pid;
+    for (int i = 2; i <= n; i++) {
+        next = first + second;
+        first = second;
+        second = next;
+    }
 
-    bpf_get_current_comm(e->caller_name, sizeof(e->caller_name));
-
-    bpf_printk("ptrace called by %s(pid %i)",
-               e->caller_name, e->caller_pid);
-
-    bpf_ringbuf_submit(e, 0);
-
-    return 0;
+    end = bpf_ktime_get_boot_ns();
+    bpf_printk("normal: %llu", end - start);
+    return (int)next;
 }
 
 //=============================================================================
@@ -97,13 +120,16 @@ int BPF_PROG(n_restrict_proc_access, struct file *file)
         return 0; // return if not part of procfs
     }
 
-    struct inode *f_inode;;
+    struct inode *f_inode;
+    ;
     bpf_probe_read_kernel(&f_inode, sizeof(f_inode), &file->f_inode);
     struct proc_inode *p_inode = container_of(f_inode, struct proc_inode, vfs_inode);
     struct pid *pid_ptr;
     bpf_probe_read_kernel(&pid_ptr, sizeof(pid_ptr), &p_inode->pid);
     pid_t target_pid;
-    bpf_probe_read_kernel(&target_pid, sizeof(target_pid), &pid_ptr->numbers[0].nr);
+    if (bpf_probe_read_kernel(&target_pid, sizeof(target_pid), &pid_ptr->numbers[0].nr) != 0) {
+        return 0;
+    }
 
     if (target_pid != PROTECTED_PID)
     {
@@ -131,7 +157,6 @@ int BPF_PROG(n_restrict_proc_access, struct file *file)
 
         bpf_get_current_comm(event->caller_name, sizeof(event->caller_name));
 
-
         bpf_ringbuf_submit(event, 0);
         end = bpf_ktime_get_boot_ns();
         bpf_printk("normal: %llu", end - start);
@@ -148,7 +173,9 @@ int BPF_KPROBE(n_kprobe_find_vpid, int nr)
     pid_t looked_up_pid = (pid_t)nr;
 
     if (looked_up_pid != PROTECTED_PID)
+    {
         return 0;
+    }
 
     struct vm_event *e = bpf_ringbuf_reserve(&rb, sizeof(struct vm_event), 0);
 
@@ -160,8 +187,6 @@ int BPF_KPROBE(n_kprobe_find_vpid, int nr)
 
     bpf_get_current_comm(e->caller_name, sizeof(e->caller_name));
     bpf_ringbuf_submit(e, 0);
-
-    bpf_printk("vpid lookup by %s, arg: %i", e->caller_name, nr);
 
     return 0;
 }

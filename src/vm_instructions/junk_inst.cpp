@@ -100,9 +100,9 @@ std::vector<vm_inst> generate_junk_inst(std::vector<vm_inst> inst_set)
                 i++;
                 continue;
             }
-            size_t target_index = i + inst_set[i].val + 1;
+            size_t target_index = i + inst_set[i].val;
 
-            for (size_t j = i + 1; j <= target_index && j < inst_set.size(); ++j) 
+            for (size_t j = i + 1; j <= target_index && j < inst_set.size(); j++)
             {
                 junk_injected_inst.push_back(inst_set[j]);
             }
@@ -118,7 +118,7 @@ std::vector<vm_inst> generate_junk_inst(std::vector<vm_inst> inst_set)
             }
         }
 
-        ++i;
+        i++;
     }
     
     return junk_injected_inst;
