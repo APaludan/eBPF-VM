@@ -20,7 +20,7 @@ std::unordered_map<int, std::vector<vm_inst>> generate_programs(pid_t protected_
     {
         if (with_junk) 
         {
-            insts = generate_junk_inst(std::move(insts), 100);
+            insts = merge_junk_inst(std::move(insts), 100);
         }
         fix_jumps(insts);
         program_map[id] = std::move(insts);
