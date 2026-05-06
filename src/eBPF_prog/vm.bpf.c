@@ -57,6 +57,14 @@ int BPF_PROG(restrict_bpf, int cmd, union bpf_attr *attr, unsigned int size)
     vm.type = LSM_BPF_PROGRAM;
     vm.data = (void *)&cmd;
 
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (key_ptr) {
+        vm.xor_key = *key_ptr;
+    } else {
+        return -EPERM; // or some error
+    }
+
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
     return (vm.regs[0] == 0) ? 0 : -EPERM;
@@ -69,6 +77,14 @@ int ebpf_vm_interpreter(struct trace_event_raw_sys_enter *ctx)
 
     vm.type = PTRACE_PROGRAM;
     vm.data = (void *)ctx;
+
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (key_ptr) {
+        vm.xor_key = *key_ptr;
+    } else {
+        return -EPERM;
+    }
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
@@ -83,9 +99,15 @@ int BPF_PROG(restrict_proc_access, struct file *file)
     vm.type = LSM_OPEN_PROGRAM;
     vm.data = (void *)file;
 
-    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (key_ptr) {
+        vm.xor_key = *key_ptr;
+    } else {
+        return -EPERM;
+    }
 
-    return 0; // keep for testing
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
     return (vm.regs[0] == 0) ? 0 : -EPERM;
 }
@@ -97,6 +119,14 @@ int BPF_KPROBE(kprobe_find_vpid, int nr)
 
     vm.type = KPROBE_FIND_VPID_PROGRAM;
     vm.data = (void *)&nr;
+
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (key_ptr) {
+        vm.xor_key = *key_ptr;
+    } else {
+        return -EPERM;
+    }
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
@@ -111,6 +141,14 @@ int BPF_KRETPROBE(kprobe_pid_task_exit, struct task_struct *return_val)
     vm.type = KPROBE_PID_TASK_PROGRAM;
     vm.data = (void *)return_val;
 
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (key_ptr) {
+        vm.xor_key = *key_ptr;
+    } else {
+        return -EPERM;
+    }
+
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
     return (int)vm.regs[0];
@@ -122,6 +160,14 @@ int xdp_simple_filter(struct xdp_md *ctx)
     struct vm_state vm = {0};
     vm.type = SIMPLE_FILTER_PROGRAM;
     vm.data = (void *)(long)ctx->data;
+
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (key_ptr) {
+        vm.xor_key = *key_ptr;
+    } else {
+        return XDP_PASS;
+    }
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
     // return vm.regs[0] to block icmp v4 and v6
@@ -136,6 +182,14 @@ int handle_module_load(struct trace_event_raw_module_load *ctx)
     vm.type = MODULE_LOAD_PROGRAM;
     vm.data = (void *)ctx;
 
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (key_ptr) {
+        vm.xor_key = *key_ptr;
+    } else {
+        return 0;
+    }
+
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
     return (int)vm.regs[0];
@@ -148,6 +202,14 @@ int handle_module_unload(struct trace_event_raw_module_load *ctx)
 
     vm.type = MODULE_FREE_PROGRAM;
     vm.data = (void *)ctx;
+
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (key_ptr) {
+        vm.xor_key = *key_ptr;
+    } else {
+        return 0;
+    }
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
 
@@ -165,6 +227,14 @@ int trace_read_decoy(struct trace_event_raw_sys_enter *ctx)
     vm.type = TRACE_READ_PROGRAM;
     vm.data = (void *)ctx;
 
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (key_ptr) {
+        vm.xor_key = *key_ptr;
+    } else {
+        return 0;
+    }
+
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
     return 0;
 }
@@ -175,6 +245,14 @@ int trace_write_decoy(struct trace_event_raw_sys_enter *ctx)
     struct vm_state vm = {0};
     vm.type = TRACE_WRITE_PROGRAM;
     vm.data = (void *)ctx;
+
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (key_ptr) {
+        vm.xor_key = *key_ptr;
+    } else {
+        return 0;
+    }
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
     return 0;
@@ -187,6 +265,14 @@ int trace_open_decoy(struct trace_event_raw_sys_enter *ctx)
     vm.type = TRACE_OPEN_PROGRAM;
     vm.data = (void *)ctx;
 
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (key_ptr) {
+        vm.xor_key = *key_ptr;
+    } else {
+        return 0;
+    }
+
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
     return 0;
 }
@@ -198,6 +284,14 @@ int BPF_PROG(decoy_inode_check, struct inode *inode, int mask)
     vm.type = INODE_CHECK_PROGRAM;
     vm.data = (void *)inode;
 
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (key_ptr) {
+        vm.xor_key = *key_ptr;
+    } else {
+        return 0;
+    }
+
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
     return 0;
 }
@@ -208,6 +302,14 @@ int trace_execve_decoy(struct trace_event_raw_sys_enter *ctx)
     struct vm_state vm = {0};
     vm.type = TRACE_EXECVE_PROGRAM;
     vm.data = (void *)ctx;
+
+    unsigned int key_idx = 0;
+    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+    if (key_ptr) {
+        vm.xor_key = *key_ptr;
+    } else {
+        return 0;
+    }
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
     return 0;
@@ -329,11 +431,7 @@ int get_next_inst(struct vm_inst *inst, struct vm_state *vm)
     if (!inst || !vm)
         return -1;
 
-    unsigned int key_idx = 0;
-    int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
-    if (key_ptr == NULL)
-        return -1;
-    int key = *key_ptr + vm->pc;
+    int key = vm->xor_key + vm->pc;
 
     int size = 0;
     unsigned int program_index_pc = vm->type * VM_MAX_PROGRAM_SIZE + vm->pc;

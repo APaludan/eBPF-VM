@@ -101,6 +101,7 @@ struct vm_state
     void *data;
     void *data_end;
     int type;
+    int xor_key;
 };
 
 static inline int next_key(int *current)
