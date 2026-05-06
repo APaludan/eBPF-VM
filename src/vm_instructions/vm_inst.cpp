@@ -36,7 +36,7 @@ std::unordered_map<int, std::vector<vm_inst>> generate_programs(pid_t protected_
     add_prog(MODULE_LOAD_PROGRAM, make_module_load_program());
     add_prog(MODULE_FREE_PROGRAM, make_module_free_program());
 
-    print_program_map_to_csv(program_map, "vm_inst");
+    //print_program_map_to_csv(program_map, "vm_inst");
 
     return program_map;
 }
