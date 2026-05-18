@@ -32,7 +32,7 @@
 #define OP_PUSH 45     // TODO: push regs[src] onto stack and sp += 8
 #define OP_POP 46      // TODO: sp -= 8 and pop top of stack into a regs[dst]
 #define OP_MOV 47      // TODO: moves from reg[src] to reg[dst]
-#define OP_READ_DATA 48
+#define OP_READ_DATA 48 // reads from `data[val]` map to reg[dst]
 
 // output
 #define OP_PRINT 60   // print bpf_printk(regs[src]) as %llu
