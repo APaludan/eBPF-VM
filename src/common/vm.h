@@ -32,6 +32,7 @@
 #define OP_PUSH 45     // TODO: push regs[src] onto stack and sp += 8
 #define OP_POP 46      // TODO: sp -= 8 and pop top of stack into a regs[dst]
 #define OP_MOV 47      // TODO: moves from reg[src] to reg[dst]
+#define OP_READ_DATA 48
 
 // output
 #define OP_PRINT 60   // print bpf_printk(regs[src]) as %llu
@@ -43,6 +44,7 @@
 #define VM_MAX_LOOPS 100000
 #define VM_STACK_SIZE 256
 #define VM_NUM_REGS 16 // must be a power of 2!!
+#define VM_DATA_SIZE 1000
 
 // XDP actions
 #define XDP_ABORTED 0
@@ -147,7 +149,7 @@ static inline bool have_dst(int op)
     case 31 ... 34:
     case 40 ... 41:
     case 43 ... 44:
-    case 46 ... 47:
+    case 46 ... 48:
         return true;
 
     default:
@@ -165,6 +167,7 @@ static inline bool have_val(int op)
     case 30 ... 35:
     case 40:
     case 42 ... 44:
+    case 48:
         return true;
     
     default:

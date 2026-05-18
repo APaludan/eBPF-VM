@@ -34,6 +34,14 @@ struct
 struct
 {
     __uint(type, BPF_MAP_TYPE_ARRAY);
+    __uint(max_entries, VM_DATA_SIZE);
+    __type(key, unsigned int);
+    __type(value, unsigned long long);
+} data SEC(".maps");
+
+struct
+{
+    __uint(type, BPF_MAP_TYPE_ARRAY);
     __uint(max_entries, VM_MAX_PROGRAM_SIZE * MAX_PROGRAMS);
     __type(key, unsigned int);
     __type(value, uint8_t);
@@ -66,6 +74,7 @@ int BPF_PROG(restrict_bpf, int cmd, union bpf_attr *attr, unsigned int size)
     }
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0; // for testing
 
     return (vm.regs[0] == 0) ? 0 : -EPERM;
 }

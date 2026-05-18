@@ -17,7 +17,7 @@ private:
     std::mutex queue_mutex;
 
 public:
-    vm_agent(std::unordered_map<int, std::vector<vm_inst>>, pid_t protected_pid, bool n_progs);
+    vm_agent(std::unordered_map<int, std::vector<vm_inst>>& program_map, pid_t protected_pid, bool n_progs);
 
     std::optional<vm_event> get_next_event();
     void print_event_data(const vm_event &e);
