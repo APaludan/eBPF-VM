@@ -1,12 +1,12 @@
 #include "vm_agent.h"
 #include <iostream>
 
-vm_agent::vm_agent(std::unordered_map<int, std::vector<vm_inst>> program_map, pid_t protected_pid, bool n_progs)      
+vm_agent::vm_agent(std::unordered_map<int, std::vector<vm_inst>>& program_map, pid_t protected_pid, bool n_progs)      
     :   handler([this](const vm_event &e) { on_event_cb(e); }),
         n_handler([this](const vm_event &e) { on_event_cb(e); })
 {
-    err = handler.load_and_attach_all(program_map);
-    if (n_progs == true)
+    err = handler.load_and_attach_all(program_map, protected_pid);
+    if (n_progs)
     {
         n_err = n_handler.load_and_attach_all(protected_pid);
     }
