@@ -176,6 +176,9 @@ static inline long vm_exec_control_flow_ops(struct vm_inst *inst, struct vm_stat
         case OP_EXIT:
             return 1; // Signal exit
 
+        case OP_NONE: 
+            break;
+
         default:
             return -1; // Not a control flow op
     }
