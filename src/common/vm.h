@@ -53,7 +53,7 @@
 #define XDP_TX 3
 #define XDP_REDIRECT 4
 
-#define MAX_PROGRAMS 8
+#define MAX_PROGRAMS 36
 
 // program and event types
 #define VM_ERROR -1
