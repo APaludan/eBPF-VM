@@ -95,6 +95,20 @@ static inline long vm_exec_memory_ops(struct vm_inst *inst, struct vm_state *vm)
             break;
         }
 
+        case OP_READ_DATA:
+        {
+            unsigned short dst = inst->dst;
+            unsigned long long *ret = bpf_map_lookup_elem(&data, &inst->val);
+            if (ret == NULL) {
+                vm->regs[0] = 1;
+                break;
+            }
+            vm->regs[0] = 0;
+            
+            vm->regs[dst] = *ret;
+            break;
+        }
+
         case OP_PUSH:
             // TODO: push regs[src] onto stack and sp += 8
             break;

@@ -32,6 +32,7 @@
 #define OP_PUSH 45     // TODO: push regs[src] onto stack and sp += 8
 #define OP_POP 46      // TODO: sp -= 8 and pop top of stack into a regs[dst]
 #define OP_MOV 47      // TODO: moves from reg[src] to reg[dst]
+#define OP_READ_DATA 48 // reads from data[val] map to reg[dst]
 
 // output
 #define OP_PRINT 60   // print bpf_printk(regs[src]) as %llu
@@ -43,6 +44,7 @@
 #define VM_MAX_LOOPS 100000
 #define VM_STACK_SIZE 256
 #define VM_NUM_REGS 16 // must be a power of 2!!
+#define VM_DATA_SIZE 1000
 
 // XDP actions
 #define XDP_ABORTED 0
@@ -51,7 +53,7 @@
 #define XDP_TX 3
 #define XDP_REDIRECT 4
 
-#define MAX_PROGRAMS 8
+#define MAX_PROGRAMS 36
 
 // program and event types
 #define VM_ERROR -1
@@ -70,6 +72,30 @@
 #define TRACE_OPEN_PROGRAM 10
 #define INODE_CHECK_PROGRAM 11
 #define TRACE_EXECVE_PROGRAM 12
+#define TRACE_CLOSE_PROGRAM 13
+#define TRACE_IOCTL_PROGRAM 14
+#define TRACE_FUTEX_PROGRAM 15
+#define TRACE_OPENAT_PROGRAM 16
+#define TRACE_UNLINK_PROGRAM 17
+#define TRACE_RENAME_PROGRAM 18
+#define TRACE_CHMOD_PROGRAM 19
+#define TRACE_CHOWN_PROGRAM 20
+#define TRACE_MKDIR_PROGRAM 21
+#define TRACE_RMDIR_PROGRAM 22
+#define LSM_MPROTECT_PROGRAM 23
+#define LSM_CHECK_SEC_PROGRAM 24
+#define LSM_TASK_ALLOC_PROGRAM 25
+#define LSM_TASK_FREE_PROGRAM 26
+#define KPROBE_SEC_FILE_OPEN_PROGRAM 27
+#define KPROBE_SEC_MMAP_PROGRAM 28
+#define KPROBE_SEC_MPROTECT_PROGRAM 29
+#define KPROBE_EXECVE_PROGRAM 30
+#define TRACE_CLONE_PROGRAM 31
+#define TRACE_IOMMU_ADD_GROUP_PROGRAM 32
+#define TRACE_IOMMU_REMOVE_GROUP_PROGRAM 33
+#define TRACE_IOMMU_ADD_DOMAIN_PROGRAM 34
+#define TRACE_IOMMU_MAP_PROGRAM 35
+#define TRACE_IOMMU_UNMAP_PROGRAM 36
 
 
 
@@ -101,6 +127,7 @@ struct vm_state
     void *data;
     void *data_end;
     int type;
+    int xor_key;
 };
 
 static inline int next_key(int *current)
@@ -146,7 +173,7 @@ static inline bool have_dst(int op)
     case 31 ... 34:
     case 40 ... 41:
     case 43 ... 44:
-    case 46 ... 47:
+    case 46 ... 48:
         return true;
 
     default:
@@ -164,6 +191,7 @@ static inline bool have_val(int op)
     case 30 ... 35:
     case 40:
     case 42 ... 44:
+    case 48:
         return true;
     
     default:

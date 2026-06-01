@@ -10,6 +10,7 @@
 #include <random>
 #include <net/if.h>
 #include <vector>
+#include <unistd.h>
 
 int vm_handler::ring_buffer_callback(void *ctx, void *data, size_t data_size)
 {
@@ -48,7 +49,19 @@ int vm_handler::populate_map(int program_type, std::vector<vm_inst> program, bpf
     return 0;
 }
 
-int vm_handler::load_and_attach_all(std::unordered_map<int, std::vector<vm_inst>> program_map)
+/// @brief Copies vec `data` into `data` map
+/// @param data 
+/// @return 
+int vm_handler::insert_data(std::vector<unsigned long long>& data) {
+    for (int i = 0; i < static_cast<int>(data.size()); i++)
+    {
+        if (bpf_map__update_elem(skel_obj->maps.data, &i, sizeof(i), &data[i], sizeof(data[i]), 0) != 0)
+            return -1;
+    }
+    return 0;
+}
+
+int vm_handler::load_and_attach_all(std::unordered_map<int, std::vector<vm_inst>>& program_map, pid_t protected_pid)
 {
     if (!on_event)
     {
@@ -80,6 +93,17 @@ int vm_handler::load_and_attach_all(std::unordered_map<int, std::vector<vm_inst>
     int key = key_dist(gen);
     unsigned int index = 0;
     bpf_map__update_elem(skel_obj->maps.key_map, &index, sizeof(index), &key, sizeof(key), 0);
+
+    std::vector<unsigned long long> data({
+        static_cast<unsigned long long>(protected_pid),
+        static_cast<unsigned long long>(getpid())
+    });
+    
+    if (insert_data(data) != 0) {
+        std::cerr << "ERROR: Failed to insert data" << std::endl;
+        return -1;
+    }
+
 
     auto map_fd = skel_obj->maps.programs;
     for (auto i : program_map)
