@@ -167,12 +167,15 @@ int handle_module_unload(struct trace_event_raw_module_load *ctx)
     return (int)vm.regs[0];
 }
 
+
+#pragma region decoys
+
 //==========================================
 //====         DECOY HOOK POINTS        ====
 //==========================================
 
 SEC("tp/syscalls/sys_enter_read")
-int trace_read_decoy(struct trace_event_raw_sys_enter *ctx)
+int trace_read(struct trace_event_raw_sys_enter *ctx)
 {
     struct vm_state vm = {0};
     vm.type = TRACE_READ_PROGRAM;
@@ -183,7 +186,7 @@ int trace_read_decoy(struct trace_event_raw_sys_enter *ctx)
 }
 
 SEC("tp/syscalls/sys_enter_write")
-int trace_write_decoy(struct trace_event_raw_sys_enter *ctx)
+int trace_write(struct trace_event_raw_sys_enter *ctx)
 {
     struct vm_state vm = {0};
     vm.type = TRACE_WRITE_PROGRAM;
@@ -195,7 +198,7 @@ int trace_write_decoy(struct trace_event_raw_sys_enter *ctx)
 }
 
 SEC("tp/syscalls/sys_enter_open")
-int trace_open_decoy(struct trace_event_raw_sys_enter *ctx)
+int trace_open(struct trace_event_raw_sys_enter *ctx)
 {
     struct vm_state vm = {0};
     vm.type = TRACE_OPEN_PROGRAM;
@@ -206,7 +209,7 @@ int trace_open_decoy(struct trace_event_raw_sys_enter *ctx)
 }
 
 SEC("lsm/inode_permission")
-int BPF_PROG(decoy_inode_check, struct inode *inode, int mask)
+int BPF_PROG(inode_check, struct inode *inode, int mask)
 {
     struct vm_state vm = {0};
     vm.type = INODE_CHECK_PROGRAM;
@@ -217,7 +220,7 @@ int BPF_PROG(decoy_inode_check, struct inode *inode, int mask)
 }
 
 SEC("tp/syscalls/sys_enter_execve")
-int trace_execve_decoy(struct trace_event_raw_sys_enter *ctx)
+int trace_execve(struct trace_event_raw_sys_enter *ctx)
 {
     struct vm_state vm = {0};
     vm.type = TRACE_EXECVE_PROGRAM;
@@ -226,6 +229,262 @@ int trace_execve_decoy(struct trace_event_raw_sys_enter *ctx)
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
     return 0;
 }
+
+SEC("tp/syscalls/sys_enter_close")
+int trace_close(struct trace_event_raw_sys_enter *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_CLOSE_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/syscalls/sys_enter_ioctl")
+int trace_ioctl(struct trace_event_raw_sys_enter *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_IOCTL_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/syscalls/sys_enter_futex")
+int trace_futex(struct trace_event_raw_sys_enter *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_FUTEX_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/syscalls/sys_enter_openat")
+int trace_openat(struct trace_event_raw_sys_enter *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_OPENAT_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+
+SEC("tp/syscalls/sys_enter_unlink")
+int trace_unlink(struct trace_event_raw_sys_enter *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_UNLINK_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/syscalls/sys_enter_rename")
+int trace_rename(struct trace_event_raw_sys_enter *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_RENAME_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/syscalls/sys_enter_chmod")
+int trace_chmod(struct trace_event_raw_sys_enter *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_CHMOD_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/syscalls/sys_enter_chown")
+int trace_chown(struct trace_event_raw_sys_enter *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_CHOWN_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/syscalls/sys_enter_mkdir")
+int trace_mkdir(struct trace_event_raw_sys_enter *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_MKDIR_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/syscalls/sys_enter_rmdir")
+int trace_rmdir(struct trace_event_raw_sys_enter *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_RMDIR_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("lsm/file_mprotect")
+int BPF_PROG(lsm_file_mprotect, struct file *file, unsigned long prot)
+{
+    struct vm_state vm = {0};
+    vm.type = LSM_MPROTECT_PROGRAM;
+    vm.data = (void *)file;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("lsm/bprm_check_security")
+int BPF_PROG(lsm_bprm_check, struct linux_binprm *bprm)
+{
+    struct vm_state vm = {0};
+    vm.type = LSM_CHECK_SEC_PROGRAM;
+    vm.data = (void *)bprm;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("lsm/task_alloc")
+int BPF_PROG(lsm_task_alloc, struct task_struct *p)
+{
+    struct vm_state vm = {0};
+    vm.type = LSM_TASK_ALLOC_PROGRAM;
+    vm.data = (void *)p;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("lsm/task_free")
+int BPF_PROG(lsm_task_free, struct task_struct *p)
+{
+    struct vm_state vm = {0};
+    vm.type = LSM_TASK_FREE_PROGRAM;
+    vm.data = (void *)p;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("kprobe/security_file_open")
+int BPF_KPROBE(kprobe_file_open, struct file *file)
+{
+    struct vm_state vm = {0};
+    vm.type = KPROBE_SEC_FILE_OPEN_PROGRAM;
+    vm.data = (void *)file;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("kprobe/security_mmap_file")
+int BPF_KPROBE(kprobe_mmap_file, struct file *file, unsigned long prot)
+{
+    struct vm_state vm = {0};
+    vm.type = KPROBE_SEC_MMAP_PROGRAM;
+    vm.data = (void *)file;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("kprobe/security_file_mprotect")
+int BPF_KPROBE(kprobe_file_mprotect, struct file *file, unsigned long prot)
+{
+    struct vm_state vm = {0};
+    vm.type = KPROBE_SEC_MPROTECT_PROGRAM;
+    vm.data = (void *)file;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+
+SEC("tp/syscalls/sys_enter_clone")
+int trace_clone(struct trace_event_raw_sys_enter *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_CLONE_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/iommu/add_device_to_group")
+int trace_iommu_add_device(struct bpf_raw_tracepoint_args *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_IOMMU_ADD_GROUP_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/iommu/remove_device_from_group")
+int trace_iommu_remove_device(struct bpf_raw_tracepoint_args *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_IOMMU_REMOVE_GROUP_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/iommu/attach_device_to_domain")
+int trace_iommu_attach_device(struct bpf_raw_tracepoint_args *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_IOMMU_ADD_DOMAIN_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/iommu/map")
+int trace_iommu_map(struct bpf_raw_tracepoint_args *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_IOMMU_MAP_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+
+SEC("tp/iommu/unmap")
+int trace_iommu_unmap(struct bpf_raw_tracepoint_args *ctx)
+{
+    struct vm_state vm = {0};
+    vm.type = TRACE_IOMMU_UNMAP_PROGRAM;
+    vm.data = (void *)ctx;
+
+    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
+    return 0;
+}
+#pragma endregion
 
 //==========================================
 //====             VM LOGIC             ====
