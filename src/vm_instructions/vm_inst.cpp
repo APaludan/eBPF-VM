@@ -20,7 +20,7 @@ std::unordered_map<int, std::vector<vm_inst>> generate_programs(bool with_junk)
     {
         if (with_junk) 
         {
-            insts = generate_junk_inst(std::move(insts));
+            insts = merge_junk_inst(std::move(insts), 100);
         }
         fix_jumps(insts);
         program_map[id] = std::move(insts);
@@ -35,6 +35,8 @@ std::unordered_map<int, std::vector<vm_inst>> generate_programs(bool with_junk)
     add_prog(SIMPLE_FILTER_PROGRAM,     make_simple_filter_program());
     add_prog(MODULE_LOAD_PROGRAM,       make_module_load_program());
     add_prog(MODULE_FREE_PROGRAM,       make_module_free_program());
+
+    //print_program_map_to_csv(program_map, "vm_inst");
 
     return program_map;
 }

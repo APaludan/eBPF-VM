@@ -1,6 +1,5 @@
 #pragma once
 #include <unistd.h>
-
 // block some bpf syscalls
 // prevents usage of: `bpftool prog list`, `bpftool link list`, `bpftool map list`
 // TODO: make it even more specific so it only block access to our programs/maps/links

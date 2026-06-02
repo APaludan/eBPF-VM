@@ -3,6 +3,7 @@
 // system
 #define OP_EXIT 0 // exit VM and eBPF. return code = r0
 #define OP_CALL 1 // call a helper function by id (can find id on docs.ebpf.io)
+#define OP_NONE 2
 
 // math things
 #define OP_ADD 10    // add regs[dst] += regs[src]

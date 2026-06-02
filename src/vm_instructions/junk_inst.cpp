@@ -1,81 +1,50 @@
 #include "junk_inst.h"
 #include <random>
 #include <fstream>
-
+#include <iostream>
+#include <bits/stdc++.h>
 //==============================================
-//===             Junk inst set              ===             
-//==============================================
-
-// TODO: Create random junk each time
-
-std::vector<vm_inst> junk_1()
-{
-    return 
-    {
-        vm_inst{OP_LOAD, 9, 0, 12345, 0},  // r9 = 12345
-        vm_inst{OP_ADD, 9, 9, 6789, 0},    // r9 += 6789
-        vm_inst{OP_SUB, 9, 9, 6789, 0},    // r9 -= 6789
-        vm_inst{OP_MULT, 9, 9, 3, 0},      // r9 *= 3
-        vm_inst{OP_DIV, 9, 9, 3, 0},       // r9 /= 3
-    };
-}
-
-std::vector<vm_inst> junk_2()
-{
-    return 
-    {
-        vm_inst{OP_LOAD, 9, 0, 1, 0},       // r9 = 1
-        vm_inst{OP_JEQ, 9, 9, 2, 0},        // always true → skip next 2
-        vm_inst{OP_LOAD, 9, 0, 999, 0},     // dead code
-        vm_inst{OP_ADD, 9, 9, 1, 0},        // dead code
-    };
-}
-
-std::vector<vm_inst> junk_3()
-{
-    return 
-    {
-        vm_inst{OP_LOAD, 9, 0, 7, 0},
-        vm_inst{OP_MULT, 9, 9, 6, 0},     // 42
-        vm_inst{OP_DIV, 9, 9, 2, 0},      // 21
-
-        vm_inst{OP_JNEQ, 9, 9, 2, 0},     // never taken
-        vm_inst{OP_LOAD, 9, 0, 999, 0},   // dead
-        vm_inst{OP_ADD, 9, 9, 1, 0},      // dead
-
-        vm_inst{OP_LSHIFT, 9, 9, 1, 0},
-        vm_inst{OP_RSHIFT, 9, 9, 1, 0},   // cancel
-    };
-}
-
-//==============================================
-//===             Junk gen logic             ===             
+//===             HELPER FUNCTIONS           ===             
 //==============================================
 
+// TODO: lav function der finder de steder der er "døde" i junk_inst (hvor vi ikke skal indsætte de rigtige instructions)
+
+// TODO: lav den mere tilbøjlig til at vælge lave numre
 static std::mt19937 rng(std::random_device{}());
-
-int random_int(int min, int max) 
+size_t random_int(size_t min, size_t max) 
 {
-    std::uniform_int_distribution<int> dist(min, max);
+    std::uniform_int_distribution<size_t> dist(min, max);
     return dist(rng);
 }
 
-std::vector<vm_inst> random_junk()
+vm_inst make_junk_inst(const std::vector<int>& unused_registers)
 {
+    if (unused_registers.empty())
+        return vm_inst{OP_NONE, 0, 0, 0, 0};
 
-    int r = random_int(0, 2);
-
-    switch (r)
+    // måske flere kan bruges 
+    static constexpr unsigned short junk_ops[] = 
     {
-        case 0:
-            return junk_1();
-        case 1:
-            return junk_2();
-        case 2:
-            return junk_3();
-        default:
-            return junk_1();
-    }
+        OP_LOAD,
+        OP_MOV,
+        OP_ADD,
+        OP_SUB,
+        OP_MULT,
+        OP_AND,
+        OP_LSHIFT,
+        OP_RSHIFT
+    };
+
+    vm_inst inst{};
+
+    //måske lave det så values afgrænsningerne for nogle values er afhængige af den opcode den vælger (fx lshift vil være mærkligt hvis det er kæmpe?)
+    inst.op = junk_ops[random_int(0, std::size(junk_ops) - 1)];
+    inst.dst = unused_registers[random_int(0, std::size(unused_registers) - 1)];
+    inst.src = unused_registers[random_int(0, std::size(unused_registers) - 1)];
+    inst.val = random_int(0, 63);
+    inst.offset = 0;
+
+    return inst;
 }
 
 bool is_jmp_op(unsigned short op) 
@@ -83,45 +52,207 @@ bool is_jmp_op(unsigned short op)
     return op >= OP_JMP && op <= OP_JGTEQ;
 }
 
-// TODO: Still neeed to tage højde for MAX_INSTRUCTION (define length of what length the instr set should be) + might be a better way then just skip next offset of instructions for each jump op
-std::vector<vm_inst> generate_junk_inst(std::vector<vm_inst> inst_set) 
+size_t get_available_junk_space (std::vector<vm_inst> inst_set, size_t max_size)
+{
+    return max_size - inst_set.size();
+}
+
+std::vector<int> get_unused_registers(std::vector<vm_inst> inst_set)
+{
+    std::vector<int> unused_registers = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+
+    for (vm_inst i : inst_set)
+    {
+        auto used_register = std::find(unused_registers.begin(), unused_registers.end(), i.dst);
+
+        if (used_register != unused_registers.end())
+            unused_registers.erase(used_register);
+    }   
+
+    return unused_registers;
+}
+
+std::vector<vm_inst> make_junk_inst_set(size_t available_junk_space, std::vector<int> unused_registers) 
 {
 
-    std::vector<vm_inst> junk_injected_inst;
-    size_t i = 0;
-    
-    while (i < inst_set.size()) 
+    std::vector<vm_inst> junk_inst_set;
+
+    for (size_t i = 0; i < available_junk_space; i++)
     {
-        junk_injected_inst.push_back(inst_set[i]);
+        vm_inst junk_inst = make_junk_inst(unused_registers);
+        junk_inst_set.push_back(junk_inst);
+    }
 
-        if (is_jmp_op(inst_set[i].op)) 
+    return junk_inst_set;
+}
+
+
+std::vector<size_t> union_2_vectors(std::vector<size_t> v1, std::vector<size_t> v2) {
+
+    std::vector<size_t> res;
+    std::unordered_set<size_t> seen;
+
+    for (size_t i : v1) 
+    {
+        if (seen.find(i) == seen.end()) 
         {
-            size_t target_index = i + inst_set[i].val;
+            res.push_back(i);  
+            seen.insert(i);
+        }
+    }
 
-            for (size_t j = i + 1; j <= target_index && j < inst_set.size(); ++j) 
-            {
-                junk_injected_inst.push_back(inst_set[j]);
-            }
-
-            i = target_index; 
-
-        } else 
+    for (size_t i : v2) 
+    {
+        if (seen.find(i) == seen.end()) 
         {
-            if (random_int(0, 100) <= 100) 
-            {
-                auto junk = random_junk();
-                junk_injected_inst.insert(junk_injected_inst.end(), junk.begin(), junk.end());
-            }
+            res.push_back(i);
+            seen.insert(i);
+        }
+    }
+
+    return res;
+}
+
+
+std::vector<std::vector<size_t>> union_jmp_indx(std::vector<std::vector<size_t>> jmp_indx)
+{
+    std::vector<std::vector<size_t>> result;
+
+    if (jmp_indx.size() <= 1)
+        return jmp_indx;
+
+    for (size_t i = 0; i < jmp_indx.size(); ++i)
+    {
+        std::vector<size_t> res = jmp_indx[i];
+
+        size_t j = i + 1;
+        while (j < jmp_indx.size())
+        {
+            if (res.back() < jmp_indx[j].front())
+                break;
+
+
+            res = union_2_vectors(res, jmp_indx[j]);
+
+            jmp_indx.erase(jmp_indx.begin() + j);
         }
 
-        ++i;
+        result.push_back(res);
     }
+
+    return result;
+}
+
+std::vector<std::vector<size_t>> get_jmp_indx(const std::vector<vm_inst>& inst_set)
+{
+    std::vector<std::vector<size_t>> jmp_indx;
+    size_t inst_set_size = inst_set.size();
+
+    for (size_t i = 0; i < inst_set_size; i++)
+    {
+        if (is_jmp_op(inst_set[i].op))
+        {
+            std::vector<size_t> jmp_affected_inst;
+            int jmp_val = inst_set[i].val;
+
+            if (jmp_val >= 0)
+            {
+                for (int j = 0; j < jmp_val; j++)
+                    jmp_affected_inst.push_back(i + static_cast<size_t>(j));
+            }
+            else
+            {
+                for (int j = 0; j > jmp_val; j--)
+                {
+                    int safe = i + j;
+                    if (safe >= 0)
+                        jmp_affected_inst.push_back(static_cast<size_t>(safe));
+                }
+                std::reverse(jmp_affected_inst.begin(), jmp_affected_inst.end());
+
+            }
+            jmp_indx.push_back(jmp_affected_inst);
+        }
+    }
+
+    std::vector<std::vector<size_t>> final_result = union_jmp_indx(jmp_indx);
+
+    return final_result;
+}
+
+std::vector<std::vector<size_t>> get_code_blocks(std::vector<vm_inst> inst_set)
+{
+    std::vector<std::vector<size_t>> jmp_indx = get_jmp_indx(inst_set);
+
+    size_t inst_set_size = inst_set.size(); 
+    std::vector<std::vector<size_t>> code_blocks;
+    size_t i = 0;
+
+    while (i < inst_set_size) 
+    {
+        if (!jmp_indx.empty() && i == jmp_indx[0].at(0))
+        {
+            code_blocks.push_back(jmp_indx[0]);
+            i = i + jmp_indx[0].size();
+            jmp_indx.erase(jmp_indx.begin());
+        }
+        else 
+        {
+            std::vector<size_t> i_vector = {i};
+            code_blocks.push_back(i_vector);
+            i += 1;
+        }
+    }
+
+    return code_blocks;
+}
+
+std::vector<vm_inst> merge_inst_sets(std::vector<vm_inst> inst_set, std::vector<vm_inst> junk_inst_set)
+{
+    std::vector<std::vector<size_t>> code_blocks = get_code_blocks(inst_set);
+    size_t insert_indx = 0;  
     
-    return junk_injected_inst;
+    for (size_t i = 0; i < code_blocks.size(); i++)
+    {       
+        for (size_t j = 0; j < code_blocks[i].size(); j++)
+        {
+
+            int insert_at = (j == 0)
+                ? random_int(insert_indx, junk_inst_set.size())
+                : insert_indx;
+                
+            junk_inst_set.insert(junk_inst_set.begin()+insert_at, inst_set[code_blocks[i].at(j)]);
+            insert_indx = insert_at+1;
+
+        }
+    }
+
+    return junk_inst_set;
 }
 
 //==============================================
-//===             Print inst set             ===             
+//===              MAIN FUNCTION             ===             
+//==============================================
+
+std::vector<vm_inst> merge_junk_inst(std::vector<vm_inst> inst_set, size_t max_size)
+{
+    if (max_size == 0)
+        return inst_set;
+
+    int available_junk_space = get_available_junk_space(inst_set, max_size);
+
+    std::vector<int> unused_registers = get_unused_registers(inst_set);
+
+    std::vector<vm_inst> junk_inst_set = make_junk_inst_set(available_junk_space, unused_registers);
+
+    std::vector<vm_inst> merged_junk_inst = merge_inst_sets(inst_set, junk_inst_set);
+
+    return merged_junk_inst;
+}
+
+
+//==============================================
+//===             PRINT INST SET             ===             
 //==============================================
 
 void print_program_map_to_csv( const std::unordered_map<int, std::vector<vm_inst>>& program_map, const std::string& filename)
@@ -142,6 +273,11 @@ void print_program_map_to_csv( const std::unordered_map<int, std::vector<vm_inst
             case PTRACE_PROGRAM: return "PTRACE_PROGRAM";
             case LSM_OPEN_PROGRAM: return "LSM_OPEN_PROGRAM";
             case LSM_BPF_PROGRAM: return "LSM_BPF_PROGRAM";
+            case KPROBE_FIND_VPID_PROGRAM: return "KPROBE_FIND_VPID_PROGRAM";
+            case KPROBE_PID_TASK_PROGRAM: return "KPROBE_PID_TASK_PROGRAM";
+            case SIMPLE_FILTER_PROGRAM: return "SIMPLE_FILTER_PROGRAM";
+            case MODULE_LOAD_PROGRAM: return "MODULE_LOAD_PROGRAM";
+            case MODULE_FREE_PROGRAM: return "MODULE_FREE_PROGRAM";
             default: return "UNKNOWN_PROGRAM";
         }
     };
