@@ -47,6 +47,16 @@ struct
     __type(value, uint8_t);
 } programs SEC(".maps");
 
+#ifdef ENABLE_COUNTERS
+struct
+{
+    __uint(type, BPF_MAP_TYPE_ARRAY);
+    __uint(max_entries, MAX_PROGRAMS);
+    __type(key, unsigned int);
+    __type(value, unsigned long long);
+} counters SEC(".maps");
+#endif
+
 #include "vm_dispatch.h"
 
 static long vm_callback_fn(unsigned int nr_loops, void *ctx);
@@ -246,17 +256,6 @@ int trace_ioctl(struct trace_event_raw_sys_enter *ctx)
 {
     struct vm_state vm = {0};
     vm.type = TRACE_IOCTL_PROGRAM;
-    vm.data = (void *)ctx;
-
-    bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
-    return 0;
-}
-
-SEC("tp/syscalls/sys_enter_futex")
-int trace_futex(struct trace_event_raw_sys_enter *ctx)
-{
-    struct vm_state vm = {0};
-    vm.type = TRACE_FUTEX_PROGRAM;
     vm.data = (void *)ctx;
 
     bpf_loop(VM_MAX_LOOPS, vm_callback_fn, (void *)&vm, 0);
@@ -498,8 +497,17 @@ static long vm_callback_fn(unsigned int nr_loops, void *ctx)
     struct vm_inst inst = {0};
 
     if (nr_loops == 0) {
-        unsigned int key_idx = 0;
-        int *key_ptr = bpf_map_lookup_elem(&key_map, &key_idx);
+        #ifdef ENABLE_COUNTERS
+        unsigned int count_key = (unsigned int)vm->type;
+        
+        unsigned long long *value = bpf_map_lookup_elem(&counters, &count_key);
+        if (value) {
+            __sync_fetch_and_add(value, 1);
+        }
+        #endif
+        
+        unsigned int key = 0;
+        int *key_ptr = bpf_map_lookup_elem(&key_map, &key);
         if (key_ptr) {
             vm->xor_key = *key_ptr;
         } else {

@@ -1,0 +1,49 @@
+Benchmark summary statistics
+============================
+
+Config: no_ebpf_F1_2020_dx12_2026-05-29_01-55-14
+  fps_mean: 224.8205232127174
+  fps_median: 227.6725
+  fps_std: 22.869046539467828
+  frametime_mean_ms: 4.497693620674513
+  frametime_median_ms: 4.39228
+  frametime_std_ms: 0.4966184018299931
+  frametime_p99_ms: 5.798856400000001
+  frametime_p999_ms: 6.503476860000064
+  frametime_p95_ms: 5.4618845
+  cpu_load_mean: 46.207910407518
+  gpu_load_mean: 86.22167574213947
+  gpu_temp_mean_c: 82.40466362199192
+  cpu_temp_mean_c: 76.89096258563147
+  source_file: no_ebpf_F1_2020_dx12_2026-05-29_01-55-14.csv
+  os: Steam Runtime 4
+  cpu: Intel Core i5-10600K CPU @ 4.10GHz
+  gpu: NVIDIA GeForce RTX 2060 SUPER
+  ram: 16259504
+  kernel: 7.0.10-1-cachyos
+  driver: 
+  cpuscheduler: powersave
+
+Config: vm_ebpf_F1_2020_dx12_2026-05-29_01-47-56
+  fps_mean: 220.53192414848323
+  fps_median: 222.5385
+  fps_std: 22.532291279075118
+  frametime_mean_ms: 4.58546832889835
+  frametime_median_ms: 4.49361
+  frametime_std_ms: 0.5111982846702005
+  frametime_p99_ms: 5.855209399999996
+  frametime_p999_ms: 6.661750790000016
+  frametime_p95_ms: 5.54114
+  cpu_load_mean: 46.75200304683342
+  gpu_load_mean: 86.45644846549582
+  gpu_temp_mean_c: 82.32854355153451
+  cpu_temp_mean_c: 76.08133759091716
+  source_file: vm_ebpf_F1_2020_dx12_2026-05-29_01-47-56.csv
+  os: Steam Runtime 4
+  cpu: Intel Core i5-10600K CPU @ 4.10GHz
+  gpu: NVIDIA GeForce RTX 2060 SUPER
+  ram: 16259504
+  kernel: 7.0.10-1-cachyos
+  driver: 
+  cpuscheduler: powersave
+
