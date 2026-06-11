@@ -7,9 +7,6 @@
 //===             HELPER FUNCTIONS           ===             
 //==============================================
 
-// TODO: lav function der finder de steder der er "døde" i junk_inst (hvor vi ikke skal indsætte de rigtige instructions)
-
-// TODO: lav den mere tilbøjlig til at vælge lave numre
 static std::mt19937 rng(std::random_device{}());
 size_t random_int(size_t min, size_t max) 
 {
@@ -19,30 +16,81 @@ size_t random_int(size_t min, size_t max)
 
 vm_inst make_junk_inst(const std::vector<int>& unused_registers)
 {
-    if (unused_registers.empty())
-        return vm_inst{OP_NONE, 0, 0, 0, 0};
-
-    // måske flere kan bruges 
-    static constexpr unsigned short junk_ops[] = 
+    static constexpr unsigned short junk_ops[] =
     {
         OP_LOAD,
         OP_MOV,
         OP_ADD,
         OP_SUB,
-        OP_MULT,
-        OP_AND,
         OP_LSHIFT,
         OP_RSHIFT
     };
 
     vm_inst inst{};
 
-    //måske lave det så values afgrænsningerne for nogle values er afhængige af den opcode den vælger (fx lshift vil være mærkligt hvis det er kæmpe?)
-    inst.op = junk_ops[random_int(0, std::size(junk_ops) - 1)];
-    inst.dst = unused_registers[random_int(0, std::size(unused_registers) - 1)];
-    inst.src = unused_registers[random_int(0, std::size(unused_registers) - 1)];
-    inst.val = random_int(0, 63);
-    inst.offset = 0;
+    auto random_reg = [&]()
+    {
+        return unused_registers[random_int(0, unused_registers.size() - 1)];
+    };
+
+    inst.op = unused_registers.empty() ? OP_NONE : junk_ops[random_int(0, std::size(junk_ops) - 1)];
+
+
+    switch (inst.op)
+    {
+        case OP_LOAD:
+            inst.dst = random_reg();
+            inst.src = 0;
+            inst.val = random_int(0, 64);
+            inst.offset = 0;
+            break;
+
+        case OP_MOV:
+            inst.dst = random_reg();
+            inst.src = random_reg();
+            inst.val = 0;
+            inst.offset = 0;
+            break;
+
+        case OP_ADD:
+            inst.dst = random_reg();
+            inst.src = random_reg();
+            inst.val = random_int(0, 64);
+            inst.offset = 0;
+            break; 
+
+        case OP_SUB:
+            inst.dst = random_reg();
+            inst.src = random_reg();
+            inst.val = random_int(0, 64);
+            inst.offset = 0;
+            break; 
+
+        case OP_LSHIFT:
+            inst.dst = random_reg();
+            inst.src = random_reg();
+            inst.val = random_int(0, 64);
+            inst.offset = 0;
+            break; 
+
+        case OP_RSHIFT:
+            inst.dst = random_reg();
+            inst.src = random_reg();
+            inst.val = random_int(0, 64);
+            inst.offset = 0;
+            break; 
+
+        case OP_NONE:
+            inst.dst = 0;
+            inst.src = 0;
+            inst.val = 0;
+            inst.offset = 0;
+            break; 
+
+        default:
+            break; 
+
+    }
 
     return inst;
 }

@@ -1,20 +1,15 @@
-# TyrSecure — eBPF Anti-Cheat
+## VM-based obfuscation for eBPF
 
-**TyrSecure** is a prototype anti-cheat system built using **eBPF**, designed to demonstrate kernel-level monitoring and enforcement capabilities.
-
-This project was developed as part of a **Computer Science Master’s Specialization Project** (9th semester, first half of specialization).
+This project was developed as part of a **AAU Master’s Project**. 
 
 ---
 
-## Project Goals
+### Project Goals
 
-- Explore kernel-level observability using eBPF
-- Detect suspicious behavior in games
-- Serve as a research and educational prototype (not production-ready)
+- Investigate the use of virtualization-based obfuscation for eBPF programs.
+- Serve as a research and educational prototype.
 
 ---
-
-## Installation & Setup
 
 ### System Requirements
 
@@ -34,35 +29,3 @@ Tested primarily on **Linux (Arch)**. Other modern Linux distributions with rece
 > - A C23 / C++23-capable toolchain is required  
 > - Root privileges are required to load and attach eBPF programs
 
----
-
-## Building from Source
-
-```sh
-git clone https://github.com/eske4/TyrSecure.git
-cd TyrSecure
-make build
-```
-
-This builds both the eBPF programs and the userspace controller.
-
----
-
-## Usage
-
-### Running the Application
-
-Attach the anti-cheat to a target process by providing its PID:
-
-```sh
-sudo ./TyrSecure <target_pid>
-```
-
-Alternatively, use the default run target:
-
-```sh
-make run
-```
-
-The `make run` target attaches to a predefined PID (default: `1`).
-You can modify this value in the `Makefile`.

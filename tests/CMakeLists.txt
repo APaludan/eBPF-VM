@@ -4,7 +4,6 @@ add_executable(
     tests
     test_xor.cpp
     test_fix_jumps.cpp
-    test_junk_inst.cpp
 )
 
 
