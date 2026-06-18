@@ -38,9 +38,17 @@ static inline long vm_exec_math_ops(struct vm_inst *inst, struct vm_state *vm)
         break;
 
     case OP_AND:
-        vm->regs[inst->dst] = vm->regs[inst->dst] & vm->regs[inst->src];
+        vm->regs[inst->dst] &= (inst->val == 0)
+            ? vm->regs[inst->src]
+            : inst->val;
         break;
 
+    case OP_OR:
+        vm->regs[inst->dst] |= (inst->val == 0)
+            ? vm->regs[inst->src]
+            : inst->val;
+        break;
+        
     default:
         return -1; // Not a math op
     }

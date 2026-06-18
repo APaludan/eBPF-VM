@@ -12,7 +12,8 @@
 #define OP_DIV 13    // divide
 #define OP_LSHIFT 14 // bit shift dst = src << val
 #define OP_RSHIFT 15 // bit shift dst = src >> val
-#define OP_AND 16    
+#define OP_AND 16    // bitwise and dst = dst & src or dst = dst & val
+#define OP_OR 17     // bitwise or dst = dst | src or dst = dst | val
 
 // control flow
 #define OP_JMP 30   // jump pc += val
@@ -151,7 +152,7 @@ static inline bool have_src(int op)
     switch (op)
     {
     case 1:
-    case 10 ... 15:
+    case 10 ... 17:
     case 31 ... 34:
     case 42 ... 43:
     case 45:
@@ -169,7 +170,7 @@ static inline bool have_dst(int op)
     switch (op)
     {
     case 1:
-    case 10 ... 15:
+    case 10 ... 17:
     case 31 ... 34:
     case 40 ... 41:
     case 43 ... 44:
@@ -187,7 +188,7 @@ static inline bool have_val(int op)
     switch (op)
     {
     case 1:
-    case 10 ... 15:
+    case 10 ... 17:
     case 30 ... 35:
     case 40:
     case 42 ... 44:
